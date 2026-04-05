@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Trophy, Star, Frown, TrendingUp, BookOpen, 
-  Check, Edit3, Sparkles, Heart, Zap, Award, 
-  Calendar, Users, MessageCircle, ArrowRight,
-  Home, Shield, Crosshair, AlertTriangle,
-  LogOut, PackageX, Meh, CalendarX, MicOff, UserX, EyeOff, MessageSquareOff,
-  Gem, Smile, BarChart2
+  Trophy, TrendingUp, BookOpen, 
+  Check, Edit3, Sparkles, Zap, Award, 
+  Users, MessageCircle,
+  Home, Crosshair,
+  CalendarClock, Presentation, Phone, RefreshCw, GitBranch, Megaphone,
+  Mail, CalendarRange, CalendarOff, Mic2, Headphones, Package, LogOut,
+  Gem, BarChart2
 } from 'lucide-react';
 
 // --- Data Constants ---
@@ -15,48 +16,99 @@ const DEFAULT_HABITS = [
   "不賴床", "不抽煙", "不喝五十嵐"
 ];
 
-const GUIDELINES = {
-  "品格": ["誠實", "謙虛", "知足", "感謝", "善良", "孝順", "準時", "己所不欲，勿施於人"],
-  "事業": ["經營生活帳號", "經營安麗專業帳號", "經營AI專業帳號", "每天早上安排聚會", "認真看待每次上台機會", "提前一週安排行程", "每週對焦一次", "做跟進記錄", "服務做到讓人感動", "搜集故事", "一流的回答異議", "一流的產品示範", "隨時銷售", "保持好形象", "好好用產品，用到有心得", "歸功給團隊、老師"],
-  "自我價值感": ["對自己守信", "相信自己", "不討好、不假裝、不解釋自己", "不在意他人對我的看法", "抬頭挺胸、姿勢開放", "接受讚美", "鬆弛感", "社群媒體限時", "管理通知"],
-  "家庭": ["與家人聯絡", "對另一半表達讚美", "在外人面前給予稱讚", "每週固定和家人吃飯", "照顧家人健康", "練習分享", "主動安排家庭聚會", "設定共同目標", "珍惜相處時間", "主動表達愛與感謝"],
-  "人際關係": ["做一個好的聆聽者，練習傾聽再發表意見。", "給予真誠的讚賞與感謝", "真誠的關心他人、焦點放在他人身上", "尋求雙贏，先利他再利己", "不批評", "不責備", "不抱怨", "記住對方的名字"],
-  "學習成長": ["保持空杯心態", "記帳", "主動選擇學習對象、來源", "AI first 嘗試用AI解決各種問題", "持續培養好習慣", "不斷學習新的AI工具"]
-};
+// 每日指引句子庫（隨機抽取）
+const DAILY_GUIDANCE_QUOTES = [
+  "當你對自己說到做到時，你散發出的氣場會讓所有人都信任你。",
+  "當你站得像個贏家，你的大腦就會開始相信你是。",
+  "你不需要活得像誰，『真實的你』才是這世界上最稀缺的資源。",
+  "當別人讚美你時，那是宇宙借他的口送你的禮物，請優雅地說聲『謝謝』並收下它。",
+  "懂你的人不需要解釋，不懂的人不值得解釋；把說明的力氣省下來，拿去發光。",
+  "相信那個還沒看見結果，卻依然選擇出發的自己。",
+  "卓越不是緊繃出來的，而是在深度放鬆後，讓才華自然流淌的狀態。",
+  "你的進度表是獨一無二的，專注腳下的節奏，不必追趕別人的風景。",
+  "成為別人的星探，去挖掘每個人身上連他自己都沒發現的光芒。",
+  "停止向宇宙投射負能量，你的嘴就是你的風水。",
+  "名字是世界上最動聽的聲音，記住它，你就握住了通往對方心門的鑰匙。",
+  "做一個好的聆聽者，好的溝通不是看你說了多少，而是看你聽進去了多少。",
+  "與其努力讓自己變得有趣，不如真心對他人感到好奇。",
+  "先幫別人達成他的願望，宇宙自然會把你的願望排進實現清單。",
+  "讓對方成為對話中的主角，你會收穫更多寶貴的資訊與好感。",
+  "你為別人點燃的燈，最終會照亮你回家的路。",
+  "主動選擇學習對象、來源，不要讓演算法餵食你。",
+  "承認自己還有進步空間，是通往卓越最快的一條捷徑。",
+  "即使台下只有一個人，也要拿出面對一千人的狀態去練習你的感染力。",
+  "定時與老師對焦，檢查你的羅盤，確保你的努力正精準地消耗在最有產值的地方。",
+  "養成通往成功的習慣，讓成功自然而然。",
+  "當你公開肯定另一半，你得到的尊重也會跟著成倍增加。",
+  "分享你的心情而不只是資訊，讓家人真正參與你的生命旅程。",
+  "家庭、家族的氛圍也是能夠主動創造的，成為那個源頭。",
+  "時時感謝另一半，做你最堅強的後盾。",
+  "滿足需求只是合格，超越預期才能讓人心動；多做那『多出一哩路』的服務。",
+  "隨時隨地銷售領導人、銷售環境，讓這成為習慣。",
+  "你的形象走在你的能力前面；讓你的外在，配得上你內在的靈魂。",
+  "你不是在賣產品，你是在分享你愛上它的理由；沒感動過自己，就感動不了別人。",
+  "早到五分鐘，能讓你在正式對話前，先贏得對方的信任與從容的節奏。",
+  "誠實能讓你擁有最輕盈的靈魂。",
+  "越結實的稻穗頭垂得越低；偉大始於謙卑，終於傲慢。",
+  "感恩是幸福的通緝令，當你開始感謝，好運就無處遁形。",
+  "父母是你生命力量的根源；根深才能葉茂，善待雙親，福報自來。",
+  "己所不欲，勿施於人，你投射出去的一切，最終都會回到你身上。",
+  "成功是眾人之功，失敗是個人之責；把光芒分給夥伴，你會贏得整片星空。",
+  "哪怕沒人看見，善良依然有它的重量；宇宙會在你看不見的地方，為你寫下報酬。",
+  "真誠的力量是很大的，試著在對話中分享你的真實故事。",
+  "別管業績了，今天去真心讚美一個陌生人，看看會發生什麼驚喜。",
+  "如果你感到停滯，就先從整理你的房間或桌子開始吧！",
+  "傾聽。在下一次對話中，嘗試讓對方多說 5 分鐘。",
+  "別擔心結果，宇宙正在計算的是你的勇氣，而不是你的成功率。",
+  "每一個『No』都是在幫你自動過濾掉不合適的人，別讓它停留在你心裡。",
+  "種子在土裡時看起來毫無動靜，但它正在紮根。你的努力也是。",
+  "你的價值不取決於別人的認可，而取決於你對目標的堅持。",
+  "專注於你能控制的事，其他的，就交給宇宙去安排。",
+  "未來的你會感謝現在那麼努力的你！",
+];
 
-// 反轉順序：EXP 由少到多
+const GUIDANCE_DRAWS_PER_DAY = 1;
+
+// EXP 由少到多；圖示採中性意象
 const FAILURE_TYPES = [
-  { label: '搭話被無視', exp: 1, icon: EyeOff },
-  { label: '訊息被不回', exp: 1, icon: MessageSquareOff },
-  { label: '邀約被拒', exp: 3, icon: UserX },
-  { label: '被放鳥', exp: 10, icon: CalendarX },
-  { label: '講課搞砸', exp: 10, icon: MicOff },
-  { label: '聽課無感', exp: 15, icon: Meh },
-  { label: '產品退貨', exp: 20, icon: PackageX },
-  { label: '退出(不續約)', exp: 30, icon: LogOut },
+  { label: '訊息被不回', exp: 1, icon: Mail },
+  { label: '邀約被拒', exp: 3, icon: CalendarRange },
+  { label: '被潑冷水', exp: 3, icon: RefreshCw },
+  { label: '被爽約', exp: 5, icon: CalendarClock },
+  { label: '產品示範後對方無感', exp: 5, icon: Presentation },
+  { label: '破題後對方態度冷淡', exp: 5, icon: MessageCircle },
+  { label: '交換聯絡方式被拒', exp: 5, icon: Phone },
+  { label: '大會約不到人自己', exp: 5, icon: Megaphone },
+  { label: '被放鳥', exp: 10, icon: CalendarOff },
+  { label: '講課搞砸', exp: 10, icon: Mic2 },
+  { label: '朋友聽課無感', exp: 15, icon: Headphones },
+  { label: '產品退貨', exp: 20, icon: Package },
+  { label: '下線退出(不續約）', exp: 30, icon: LogOut },
+  { label: '跟進對象加入別的團隊', exp: 30, icon: Users },
+  { label: '發展型下線不做了', exp: 100, icon: GitBranch },
 ];
 
 const FAILURE_QUOTES = [
-  "失敗為成功之母。",
-  "失敗是通往勝利的必經之路。",
-  "跌倒了，爬起來就是成功。",
-  "每一次失敗都是一次學習的機會。",
-  "成功是從一個失敗走向另一個失敗，卻不減少熱情。",
-  "失敗是成長的養分。",
-  "挫折是強者的進身之階。",
-  "失敗不是終點，放棄才是。",
-  "只有敢於大膽失敗的人，才能取得偉大的成就。",
-  "失敗只是暫時的停止，而不是永久的句點。",
-  "經驗是失敗的果實。",
-  "跌倒不是失敗，不願站起來才是。",
-  "失敗是重新開始的契機。",
-  "偉大的成功往往建立在無數次的失敗之上。",
-  "錯誤是通往真理的橋樑。",
-  "失敗能磨練人的意志。",
-  "從失敗中吸取教訓，是通往成功的捷徑。",
-  "失敗的次數越多，成功的甜度越高。",
-  "勇往直前的人，永遠不會被失敗擊倒。",
-  "失敗是給予成功滋味的調味品。"
+  "每一段過程都是升級的資料點。",
+  "寫下來，下一步會更有方向。",
+  "經驗累積，就是實力。",
+  "誠實面對狀況的人，成長最快。",
+  "今天的紀錄，是明天更好的起點。",
+  "持續往前走，就是在變強。",
+  "清楚看見場景，就能優化策略。",
+  "願意紀錄的人，已經在進步。",
+  "沒有白走的路，每一步都算數。",
+  "保持行動，時間與經驗會幫你加值。",
+  "調整節奏，再出發就好。",
+  "紀錄讓你更了解自己與對方。",
+  "專注在可改變的下一步。",
+  "穩穩累積，遠比一次完美更重要。",
+  "你正在把經歷變成資產。",
+  "每一次回顧，都是微調的機會。",
+  "帶著覺察前進，路會越來越寬。",
+  "給自己一點肯定，然後繼續前進。",
+  "成長來自於真實的觀察與紀錄。",
+  "下一場對話，你會比上一場更從容。"
 ];
 
 const MILESTONES = {
@@ -112,46 +164,141 @@ const getStyleByTitle = (title) => {
   return { bg: "from-slate-700 via-slate-800 to-slate-900", text: "from-slate-200 to-slate-400", icon: "text-slate-400" };
 };
 
+// --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
+const STORAGE_KEY = 'road-to-diamond-game-v1';
+const SAVE_VERSION = 1;
+
+const DEFAULT_STAT_REWARDS = {
+  contacts: false,
+  gatherings: false,
+  strangers: false,
+  doubleDouble: false,
+  all: false,
+};
+
+function getTodayKey() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function initialCompletedLineCount(grid) {
+  let completedLines = 0;
+  WIN_LINES.forEach((line) => {
+    if (grid[line[0]] && grid[line[1]] && grid[line[2]]) completedLines++;
+  });
+  return completedLines;
+}
+
+function createFreshGameState() {
+  const today = getTodayKey();
+  return {
+    baseExp: 0,
+    seasonRecord: { wins: 0, losses: 0 },
+    habits: [...DEFAULT_HABITS],
+    gridState: Array(9).fill(false),
+    streak: 0,
+    hasWonToday: false,
+    hasPerfectDayToday: false,
+    failures: [],
+    businessRecords: [],
+    todayStats: { contacts: 0, gatherings: 0, strangers: 0 },
+    statRewards: { ...DEFAULT_STAT_REWARDS },
+    tripleDoubleStreak: 0,
+    guidanceDaily: { dayKey: today, draws: [] },
+  };
+}
+
+function loadPersistedGameState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (d.v !== SAVE_VERSION) return null;
+    const today = getTodayKey();
+    const newDay = !d.lastPlayDate || d.lastPlayDate !== today;
+    let guidanceDaily = d.guidanceDaily;
+    if (!guidanceDaily || typeof guidanceDaily !== 'object' || !Array.isArray(guidanceDaily.draws)) {
+      guidanceDaily = { dayKey: today, draws: [] };
+    } else if (guidanceDaily.dayKey !== today) {
+      guidanceDaily = { dayKey: today, draws: [] };
+    }
+    const habits =
+      Array.isArray(d.habits) && d.habits.length === 9 ? [...d.habits] : [...DEFAULT_HABITS];
+    const gridOk = Array.isArray(d.gridState) && d.gridState.length === 9;
+    const gridState = newDay ? Array(9).fill(false) : gridOk ? d.gridState.map(Boolean) : Array(9).fill(false);
+    return {
+      baseExp: typeof d.baseExp === 'number' && d.baseExp >= 0 ? d.baseExp : 0,
+      seasonRecord:
+        d.seasonRecord && typeof d.seasonRecord === 'object'
+          ? { wins: Number(d.seasonRecord.wins) || 0, losses: Number(d.seasonRecord.losses) || 0 }
+          : { wins: 0, losses: 0 },
+      habits,
+      gridState,
+      streak: typeof d.streak === 'number' && d.streak >= 0 ? d.streak : 0,
+      hasWonToday: newDay ? false : !!d.hasWonToday,
+      hasPerfectDayToday: newDay ? false : !!d.hasPerfectDayToday,
+      failures: Array.isArray(d.failures) ? d.failures : [],
+      businessRecords: Array.isArray(d.businessRecords) ? d.businessRecords : [],
+      todayStats: newDay
+        ? { contacts: 0, gatherings: 0, strangers: 0 }
+        : {
+            contacts: Number(d.todayStats?.contacts) || 0,
+            gatherings: Number(d.todayStats?.gatherings) || 0,
+            strangers: Number(d.todayStats?.strangers) || 0,
+          },
+      statRewards: newDay
+        ? { ...DEFAULT_STAT_REWARDS }
+        : {
+            contacts: !!d.statRewards?.contacts,
+            gatherings: !!d.statRewards?.gatherings,
+            strangers: !!d.statRewards?.strangers,
+            doubleDouble: !!d.statRewards?.doubleDouble,
+            all: !!d.statRewards?.all,
+          },
+      tripleDoubleStreak:
+        typeof d.tripleDoubleStreak === 'number' && d.tripleDoubleStreak >= 0 ? d.tripleDoubleStreak : 0,
+      guidanceDaily,
+    };
+  } catch {
+    return null;
+  }
+}
+
+const INITIAL_GAME = loadPersistedGameState() ?? createFreshGameState();
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   
   // --- Game State ---
-  const [baseExp, setBaseExp] = useState(1250); 
-  const [seasonRecord, setSeasonRecord] = useState({ wins: 12, losses: 4 }); // 本季戰績
+  const [baseExp, setBaseExp] = useState(INITIAL_GAME.baseExp);
+  const [seasonRecord, setSeasonRecord] = useState(INITIAL_GAME.seasonRecord);
   
   // --- Bingo State ---
-  const [habits, setHabits] = useState(DEFAULT_HABITS);
-  const [gridState, setGridState] = useState(Array(9).fill(false));
+  const [habits, setHabits] = useState(INITIAL_GAME.habits);
+  const [gridState, setGridState] = useState(INITIAL_GAME.gridState);
   const [isEditingHabits, setIsEditingHabits] = useState(false);
-  const [tempHabits, setTempHabits] = useState([...DEFAULT_HABITS]);
-  const [streak, setStreak] = useState(6); 
-  const [hasWonToday, setHasWonToday] = useState(false);
-  const [hasPerfectDayToday, setHasPerfectDayToday] = useState(false);
+  const [tempHabits, setTempHabits] = useState([...INITIAL_GAME.habits]);
+  const [streak, setStreak] = useState(INITIAL_GAME.streak);
+  const [hasWonToday, setHasWonToday] = useState(INITIAL_GAME.hasWonToday);
+  const [hasPerfectDayToday, setHasPerfectDayToday] = useState(INITIAL_GAME.hasPerfectDayToday);
 
   // --- Failures State ---
-  const [failures, setFailures] = useState([
-    { id: 1, label: "被放鳥", text: "被放鳥", exp: 10, date: "2023-10-25" }
-  ]);
+  const [failures, setFailures] = useState(INITIAL_GAME.failures);
   const [customFailureText, setCustomFailureText] = useState("");
   const [showCelebrate, setShowCelebrate] = useState(false);
   const [recentExpGain, setRecentExpGain] = useState(0);
   const [failureQuote, setFailureQuote] = useState("");
 
   // --- Stats State ---
-  const [businessRecords, setBusinessRecords] = useState([
-    { date: "2023-10-21", contacts: 5, gatherings: 1, strangers: 2 },
-    { date: "2023-10-22", contacts: 8, gatherings: 2, strangers: 3 },
-    { date: "2023-10-23", contacts: 3, gatherings: 0, strangers: 1 },
-    { date: "2023-10-24", contacts: 10, gatherings: 1, strangers: 5 },
-  ]);
+  const [businessRecords, setBusinessRecords] = useState(INITIAL_GAME.businessRecords);
   
   // --- Match Stats (Today) State ---
-  const [todayStats, setTodayStats] = useState({ contacts: 0, gatherings: 0, strangers: 0 });
-  const [statRewards, setStatRewards] = useState({ contacts: false, gatherings: false, strangers: false, doubleDouble: false, all: false });
-  const [tripleDoubleStreak, setTripleDoubleStreak] = useState(0);
+  const [todayStats, setTodayStats] = useState(INITIAL_GAME.todayStats);
+  const [statRewards, setStatRewards] = useState(INITIAL_GAME.statRewards);
+  const [tripleDoubleStreak, setTripleDoubleStreak] = useState(INITIAL_GAME.tripleDoubleStreak);
   
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
+  const calendarDayRef = useRef(getTodayKey());
 
   // --- Animation State ---
   const [showFullWinAnim, setShowFullWinAnim] = useState(false);
@@ -159,11 +306,95 @@ export default function App() {
   const [showLevelUpAnim, setShowLevelUpAnim] = useState(false);
   const [levelUpData, setLevelUpData] = useState({ lv: 1, title: "", isNewTitle: false });
   const [prevLevel, setPrevLevel] = useState(null);
-  const [prevLines, setPrevLines] = useState(0);
+  const [prevLines, setPrevLines] = useState(() => initialCompletedLineCount(INITIAL_GAME.gridState));
   const [floatingTexts, setFloatingTexts] = useState([]);
 
-  // --- Guidelines State ---
-  const [randomGuideline, setRandomGuideline] = useState(null);
+  // --- 今日指引：每日抽一次 ---
+  const [guidanceDaily, setGuidanceDaily] = useState(INITIAL_GAME.guidanceDaily);
+  const [guidanceDrawing, setGuidanceDrawing] = useState(false);
+  const [guidanceRevealNonce, setGuidanceRevealNonce] = useState(0);
+  const guidanceDrawTimerRef = useRef(null);
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    setGuidanceDaily((prev) => (prev.dayKey === today ? prev : { dayKey: today, draws: [] }));
+  }, [activeTab]);
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    if (guidanceDaily.dayKey === today && guidanceDaily.draws.length === 0) {
+      setGuidanceRevealNonce(0);
+    }
+  }, [guidanceDaily.dayKey, guidanceDaily.draws.length]);
+
+  useEffect(() => {
+    return () => {
+      if (guidanceDrawTimerRef.current) clearTimeout(guidanceDrawTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const payload = {
+      v: SAVE_VERSION,
+      lastPlayDate: getTodayKey(),
+      baseExp,
+      seasonRecord,
+      habits,
+      gridState,
+      streak,
+      hasWonToday,
+      hasPerfectDayToday,
+      failures,
+      businessRecords,
+      todayStats,
+      statRewards,
+      tripleDoubleStreak,
+      guidanceDaily,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      /* 無痕模式或容量不足時略過 */
+    }
+  }, [
+    baseExp,
+    seasonRecord,
+    habits,
+    gridState,
+    streak,
+    hasWonToday,
+    hasPerfectDayToday,
+    failures,
+    businessRecords,
+    todayStats,
+    statRewards,
+    tripleDoubleStreak,
+    guidanceDaily,
+  ]);
+
+  useEffect(() => {
+    const rollIfNewDay = () => {
+      const today = getTodayKey();
+      if (calendarDayRef.current === today) return;
+      calendarDayRef.current = today;
+      setHasWonToday(false);
+      setHasPerfectDayToday(false);
+      setGridState(Array(9).fill(false));
+      setTodayStats({ contacts: 0, gatherings: 0, strangers: 0 });
+      setStatRewards({ ...DEFAULT_STAT_REWARDS });
+      setGuidanceDaily({ dayKey: today, draws: [] });
+      setPrevLines(0);
+    };
+    const id = setInterval(rollIfNewDay, 60_000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') rollIfNewDay();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
 
   // --- Logic & Effects ---
 
@@ -442,6 +673,32 @@ export default function App() {
     }
   };
 
+  const guidanceTodayKey = new Date().toISOString().split('T')[0];
+  const guidanceDrawsToday = guidanceDaily.dayKey === guidanceTodayKey ? guidanceDaily.draws : [];
+  const guidanceRemainingToday = Math.max(0, GUIDANCE_DRAWS_PER_DAY - guidanceDrawsToday.length);
+
+  const drawTodayGuidance = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setGuidanceDaily((prev) => {
+      const base = prev.dayKey === today ? prev : { dayKey: today, draws: [] };
+      if (base.draws.length >= GUIDANCE_DRAWS_PER_DAY) return base;
+      const quote = DAILY_GUIDANCE_QUOTES[Math.floor(Math.random() * DAILY_GUIDANCE_QUOTES.length)];
+      return { ...base, draws: [...base.draws, quote] };
+    });
+  };
+
+  const handleDrawTodayGuidance = () => {
+    if (guidanceDrawing || guidanceDrawsToday.length > 0) return;
+    setGuidanceDrawing(true);
+    if (guidanceDrawTimerRef.current) clearTimeout(guidanceDrawTimerRef.current);
+    guidanceDrawTimerRef.current = setTimeout(() => {
+      drawTodayGuidance();
+      setGuidanceDrawing(false);
+      setGuidanceRevealNonce((n) => n + 1);
+      guidanceDrawTimerRef.current = null;
+    }, 1000);
+  };
+
   const renderHome = () => {
     const cardStyle = getStyleByTitle(currentTitle);
 
@@ -485,10 +742,70 @@ export default function App() {
                 <span className="bg-black/20 px-2.5 py-1 rounded-md text-[10px] text-white/90 border border-white/10">
                    本季戰績：{seasonRecord.wins}勝 {seasonRecord.losses}負
                 </span>
-                <span className="bg-rose-500/30 px-2.5 py-1 rounded-md text-[10px] text-rose-100 border border-rose-500/30 flex items-center gap-1">
-                   <Frown size={12} /> 累計失敗：{failures.length}
+                <span className="bg-indigo-500/25 px-2.5 py-1 rounded-md text-[10px] text-indigo-100 border border-indigo-400/30 flex items-center gap-1">
+                   <Sparkles size={12} className="text-indigo-200" /> 學習紀錄：{failures.length} 筆
                 </span>
               </div>
+          </div>
+
+          {/* 今日指引：與等級卡同匡 */}
+          <div className="mt-5 pt-5 border-t border-white/20 relative z-10">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 border border-white/20">
+                  <BookOpen size={16} className="text-white/90" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold tracking-wide text-white/90">今日指引</p>
+                  <p className="text-[9px] text-white/55 truncate">每天一次 · 為今天抽一句話</p>
+                </div>
+              </div>
+              {guidanceRemainingToday > 0 && !guidanceDrawsToday.length && !guidanceDrawing && (
+                <span className="shrink-0 text-[9px] font-bold bg-amber-400/25 text-amber-100 px-2 py-1 rounded-full border border-amber-300/35">
+                  可抽
+                </span>
+              )}
+            </div>
+
+            {guidanceDrawing ? (
+              <div className="anim-guidance-draw-panel relative overflow-hidden rounded-2xl border border-white/25 bg-black/20 px-4 py-8 backdrop-blur-md">
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-40">
+                  <div className="h-36 w-36 shrink-0 rounded-full bg-[conic-gradient(from_0deg,transparent,rgba(255,255,255,0.4),transparent)] anim-guidance-orbit" />
+                </div>
+                <div className="relative flex flex-col items-center gap-3">
+                  <div className="relative flex h-14 w-14 items-center justify-center">
+                    <Sparkles size={36} className="relative z-10 text-amber-200 drop-shadow-[0_0_12px_rgba(253,230,138,0.8)] anim-guidance-sparkle" />
+                    <Sparkles size={18} className="absolute -right-1 top-0 text-white/80 anim-guidance-sparkle-delay" />
+                    <Sparkles size={14} className="absolute -left-0.5 bottom-0 text-amber-100/90 anim-guidance-sparkle-delay2" />
+                  </div>
+                  <p className="text-center text-xs font-semibold text-white/90 anim-guidance-shimmer">
+                    正在為你抽選今日指引…
+                  </p>
+                </div>
+              </div>
+            ) : guidanceDrawsToday.length > 0 ? (
+              <div
+                key={guidanceRevealNonce}
+                className={`rounded-2xl border border-white/25 bg-white/10 p-4 shadow-inner backdrop-blur-sm ${guidanceRevealNonce > 0 ? 'anim-guidance-reveal' : ''}`}
+              >
+                <p className="text-center text-sm font-semibold leading-relaxed text-white drop-shadow-sm">
+                  「{guidanceDrawsToday[0]}」
+                </p>
+                <p className="mt-3 text-center text-[10px] text-white/50">明天可再抽一次新的指引</p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDrawTodayGuidance}
+                className="group relative w-full overflow-hidden rounded-2xl border border-white/30 bg-white/15 py-3.5 pl-4 pr-4 text-left font-bold text-white shadow-md transition-all active:scale-[0.99] hover:border-white/45 hover:bg-white/22"
+              >
+                <span className="pointer-events-none absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-[100%]" />
+                <span className="relative flex items-center justify-center gap-2">
+                  <Sparkles size={18} className="text-amber-200" />
+                  抽取今日指引
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -621,19 +938,19 @@ export default function App() {
 
   const renderFailures = () => (
     <div className="space-y-6 animate-fadeIn">
-      <div className="bg-gradient-to-br from-rose-50 to-orange-50 rounded-3xl p-6 text-center border border-rose-100 relative overflow-hidden">
-        <h2 className="text-2xl font-bold text-gray-800 mb-1">失敗記錄</h2>
+      <div className="bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 rounded-3xl p-6 text-center border border-indigo-100 relative overflow-hidden">
+        <h2 className="text-2xl font-bold text-gray-800 mb-1">學習紀錄</h2>
         <div className="flex justify-center mb-3">
-           <span className="bg-white text-rose-600 font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-1 shadow-sm border border-rose-100">
-             <Frown size={16} /> 累積失敗次數：{failures.length}
+           <span className="bg-white text-indigo-700 font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-1.5 shadow-sm border border-indigo-100">
+             <Sparkles size={16} className="text-amber-500" /> 累計紀錄：{failures.length} 次
            </span>
         </div>
-        <p className="text-gray-600 text-sm mb-4">失敗是養分！紀錄搞砸的事，獲取大量 EXP！</p>
+        <p className="text-gray-600 text-sm mb-4">把當下的情境記下來，轉成經驗值，下一步會更清楚。</p>
         
         {showCelebrate && (
           <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center animate-fadeIn p-6">
-            <Sparkles size={40} className="text-rose-500 mb-3" />
-            <h3 className="text-lg font-bold text-rose-600 mb-2 leading-relaxed">「{failureQuote}」</h3>
+            <Sparkles size={40} className="text-amber-500 mb-3" />
+            <h3 className="text-lg font-bold text-indigo-800 mb-2 leading-relaxed">「{failureQuote}」</h3>
             <p className="font-black text-2xl text-amber-500 mt-1">+{recentExpGain} EXP</p>
           </div>
         )}
@@ -645,32 +962,32 @@ export default function App() {
               <button
                 key={idx}
                 onClick={() => recordFailure(type)}
-                className="bg-white hover:bg-rose-100 active:scale-95 transition-all p-3 rounded-xl border border-rose-100 shadow-sm flex flex-col items-center justify-center gap-1"
+                className="bg-white hover:bg-indigo-50 active:scale-95 transition-all p-3 rounded-xl border border-indigo-100 shadow-sm flex flex-col items-center justify-center gap-1"
               >
-                <div className="text-rose-400 mb-1"><IconComponent size={24} /></div>
-                <span className="text-xs font-bold text-gray-700">{type.label}</span>
-                <span className="text-[10px] text-amber-500 font-bold">+{type.exp} EXP</span>
+                <div className="text-indigo-500 mb-1"><IconComponent size={24} /></div>
+                <span className="text-xs font-bold text-gray-700 leading-snug">{type.label}</span>
+                <span className="text-[10px] text-amber-600 font-bold">+{type.exp} EXP</span>
               </button>
             );
           })}
         </div>
 
-        <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-rose-200/50">
-          <p className="text-xs text-gray-500 font-medium text-left ml-1">其他搞砸的事情 (+1 EXP)</p>
+        <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-indigo-100">
+          <p className="text-xs text-gray-500 font-medium text-left ml-1">其他想紀錄的情境（+1 EXP）</p>
           <div className="flex gap-2">
             <input 
               type="text" 
               value={customFailureText}
               onChange={(e) => setCustomFailureText(e.target.value)}
-              placeholder="例如：講錯話、忘記帶資料..."
-              className="flex-1 px-4 py-2 rounded-xl border-none shadow-inner bg-white/60 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none transition-all text-sm"
+              placeholder="簡短描述這次的狀況…"
+              className="flex-1 px-4 py-2 rounded-xl border-none shadow-inner bg-white/80 focus:bg-white focus:ring-2 focus:ring-indigo-300 outline-none transition-all text-sm"
             />
             <button 
               onClick={() => {
                 if(!customFailureText) return;
                 recordFailure({ label: '自訂', exp: 1 }, customFailureText);
               }}
-              className="bg-rose-500 hover:bg-rose-600 text-white font-bold px-4 rounded-xl transition-all shadow-md active:scale-95 whitespace-nowrap text-sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 rounded-xl transition-all shadow-md active:scale-95 whitespace-nowrap text-sm"
             >
               記錄
             </button>
@@ -779,63 +1096,6 @@ export default function App() {
     );
   };
 
-  const renderGuidelines = () => {
-    const drawRandomGuideline = () => {
-      const categories = Object.keys(GUIDELINES);
-      const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-      const items = GUIDELINES[randomCategory];
-      const randomItem = items[Math.floor(Math.random() * items.length)];
-      setRandomGuideline({ category: randomCategory, text: randomItem });
-    };
-
-    return (
-      <div className="space-y-6 animate-fadeIn pb-10">
-        <div className="bg-gradient-to-br from-violet-600 to-indigo-800 rounded-3xl p-8 text-center text-white shadow-lg relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Sparkles size={80} />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">宇宙指引盲盒</h2>
-          <p className="text-indigo-200 text-sm mb-6">迷茫的時候，抽一張今天的行動方針吧！</p>
-          
-          {randomGuideline ? (
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 mb-6 animate-fadeIn">
-              <p className="text-indigo-200 text-xs font-bold tracking-wider mb-2">{randomGuideline.category}</p>
-              <p className="text-xl font-bold leading-snug">「{randomGuideline.text}」</p>
-            </div>
-          ) : (
-             <div className="bg-white/5 border border-white/10 border-dashed rounded-2xl p-6 mb-6">
-                <p className="text-indigo-300">點擊下方按鈕抽取</p>
-             </div>
-          )}
-
-          <button 
-            onClick={drawRandomGuideline}
-            className="bg-white text-indigo-900 font-bold py-3 px-8 rounded-full shadow-lg hover:bg-indigo-50 transition-all active:scale-95 w-full flex items-center justify-center gap-2"
-          >
-            <Sparkles size={18} /> 抽取今日指引
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="font-bold text-gray-700 ml-2">完整指導方針</h3>
-          {Object.entries(GUIDELINES).map(([category, items]) => (
-            <div key={category} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-              <h4 className="font-bold text-lg text-indigo-900 mb-3 border-b border-gray-50 pb-2">{category}</h4>
-              <ul className="space-y-2">
-                {items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-gray-600 text-sm">
-                    <ArrowRight size={14} className="text-indigo-300 mt-1 flex-shrink-0" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   // --- Main Layout ---
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
@@ -860,7 +1120,6 @@ export default function App() {
           {activeTab === 'home' && renderHome()}
           {activeTab === 'failures' && renderFailures()}
           {activeTab === 'stats' && renderStats()}
-          {activeTab === 'guidelines' && renderGuidelines()}
         </main>
 
         {/* --- Global Animations Overlays --- */}
@@ -939,24 +1198,24 @@ export default function App() {
 
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 w-full max-w-md bg-white border-t border-gray-100 px-2 py-3 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-50 rounded-t-3xl pb-safe">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'home' ? 'text-indigo-600' : 'text-gray-400'}`}>
-            <div className={`p-1 rounded-xl ${activeTab === 'home' ? 'bg-indigo-50' : ''}`}><Home size={22} className={activeTab === 'home' ? 'fill-indigo-600' : ''} /></div>
+          <button onClick={() => setActiveTab('home')} className={`relative flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'home' ? 'text-indigo-600' : 'text-gray-400'}`}>
+            <div className={`relative p-1 rounded-xl ${activeTab === 'home' ? 'bg-indigo-50' : ''}`}>
+              <Home size={22} className={activeTab === 'home' ? 'fill-indigo-600' : ''} />
+              {guidanceRemainingToday > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white shadow-sm" aria-hidden />
+              )}
+            </div>
             <span className="text-[10px] font-bold">首頁</span>
           </button>
 
-          <button onClick={() => setActiveTab('failures')} className={`flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'failures' ? 'text-emerald-600' : 'text-gray-400'}`}>
-            <div className={`p-1 rounded-xl ${activeTab === 'failures' ? 'bg-emerald-50' : ''}`}><Smile size={22} /></div>
-            <span className="text-[10px] font-bold">失敗記錄</span>
+          <button onClick={() => setActiveTab('failures')} className={`flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'failures' ? 'text-indigo-600' : 'text-gray-400'}`}>
+            <div className={`p-1 rounded-xl ${activeTab === 'failures' ? 'bg-indigo-50' : ''}`}><Sparkles size={22} /></div>
+            <span className="text-[10px] font-bold">學習紀錄</span>
           </button>
 
           <button onClick={() => setActiveTab('stats')} className={`flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'stats' ? 'text-blue-600' : 'text-gray-400'}`}>
             <div className={`p-1 rounded-xl ${activeTab === 'stats' ? 'bg-blue-50' : ''}`}><BarChart2 size={22} /></div>
             <span className="text-[10px] font-bold">Stats</span>
-          </button>
-
-          <button onClick={() => setActiveTab('guidelines')} className={`flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'guidelines' ? 'text-violet-600' : 'text-gray-400'}`}>
-            <div className={`p-1 rounded-xl ${activeTab === 'guidelines' ? 'bg-violet-50' : ''}`}><BookOpen size={22} /></div>
-            <span className="text-[10px] font-bold">指南</span>
           </button>
         </nav>
       </div>
@@ -1007,6 +1266,48 @@ export default function App() {
         }
         .pb-safe {
           padding-bottom: env(safe-area-inset-bottom, 1rem);
+        }
+        @keyframes guidanceReveal {
+          0% { opacity: 0; transform: translateY(14px) scale(0.94); filter: blur(8px); }
+          60% { opacity: 1; filter: blur(0); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+        .anim-guidance-reveal {
+          animation: guidanceReveal 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @keyframes guidanceDrawBreath {
+          0%, 100% { transform: scale(1); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); }
+          50% { transform: scale(1.01); box-shadow: inset 0 0 20px rgba(255,255,255,0.08); }
+        }
+        .anim-guidance-draw-panel {
+          animation: guidanceDrawBreath 1.1s ease-in-out infinite;
+        }
+        @keyframes guidanceOrbit {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .anim-guidance-orbit {
+          animation: guidanceOrbit 2.5s linear infinite;
+        }
+        @keyframes guidanceSparkle {
+          0%, 100% { transform: scale(1) rotate(-6deg); opacity: 1; }
+          50% { transform: scale(1.12) rotate(6deg); opacity: 0.85; }
+        }
+        .anim-guidance-sparkle {
+          animation: guidanceSparkle 0.7s ease-in-out infinite;
+        }
+        .anim-guidance-sparkle-delay {
+          animation: guidanceSparkle 0.9s ease-in-out infinite 0.15s;
+        }
+        .anim-guidance-sparkle-delay2 {
+          animation: guidanceSparkle 0.8s ease-in-out infinite 0.3s;
+        }
+        @keyframes guidanceShimmer {
+          0%, 100% { opacity: 0.65; }
+          50% { opacity: 1; }
+        }
+        .anim-guidance-shimmer {
+          animation: guidanceShimmer 1s ease-in-out infinite;
         }
       `}} />
     </div>
