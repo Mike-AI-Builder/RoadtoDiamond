@@ -792,6 +792,14 @@ function AppInner() {
   const [businessRecords, setBusinessRecords] = useState(INITIAL_GAME.businessRecords);
   const [editingBusinessRecordIndex, setEditingBusinessRecordIndex] = useState(null);
   const [draftBusinessRecord, setDraftBusinessRecord] = useState({ contacts: 0, gatherings: 0, strangers: 0 });
+  const confirmActionRef = useRef(null);
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: '確認',
+    message: '',
+    confirmText: '確定',
+    cancelText: '取消',
+  });
   
   // --- Match Stats (Today) State ---
   const [todayStats, setTodayStats] = useState(INITIAL_GAME.todayStats);
@@ -1325,9 +1333,17 @@ function AppInner() {
   const removeFailure = (id) => {
     const item = failures.find((f) => f.id === id);
     if (!item) return;
-    if (!window.confirm('確定要刪除這筆學習紀錄嗎？')) return;
-    setFailures((prev) => prev.filter((f) => f.id !== id));
-    setBaseExp((prev) => Math.max(0, prev - item.exp));
+    openConfirm({
+      title: '刪除學習紀錄',
+      message: '確定要刪除這筆學習紀錄嗎？',
+      confirmText: '刪除',
+      cancelText: '取消',
+      onConfirm: () => {
+        setFailures((prev) => prev.filter((f) => f.id !== id));
+        setBaseExp((prev) => Math.max(0, prev - item.exp));
+        closeConfirm();
+      },
+    });
   };
 
   const calculateDayExp = (stats) => {
@@ -1360,6 +1376,16 @@ function AppInner() {
     if (expDiff !== 0) {
       setBaseExp(prev => prev + expDiff);
     }
+  };
+
+  const openConfirm = ({ title = '確認', message, confirmText = '確定', cancelText = '取消', onConfirm }) => {
+    confirmActionRef.current = typeof onConfirm === 'function' ? onConfirm : null;
+    setConfirmModal({ open: true, title, message: String(message || ''), confirmText, cancelText });
+  };
+
+  const closeConfirm = () => {
+    confirmActionRef.current = null;
+    setConfirmModal((p) => ({ ...p, open: false }));
   };
 
   const guidanceTodayKey = getGameDayKey(new Date(), settlementTime);
@@ -2004,34 +2030,49 @@ function AppInner() {
   };
 
   const beginSettingsEdit = (section) => {
+    const doBegin = () => {
+      setIconPickerOpenId(null);
+      if (section === 'guidance') {
+        const next = [...guidanceQuotes];
+        prevDraftGuidanceCount.current = next.length;
+        setDraftGuidanceQuotes(next);
+      }
+      if (section === 'failures') {
+        const copy = failureTypes.map((ft) => ({ ...ft }));
+        prevDraftFailureCount.current = copy.length;
+        setDraftFailureTypes(copy);
+      }
+      if (section === 'stats') {
+        setDraftStatTargets({
+          contacts: { ...statTargets.contacts },
+          gatherings: { ...statTargets.gatherings },
+          strangers: { ...statTargets.strangers },
+        });
+      }
+      if (section === 'settlement') {
+        setDraftSettlementTime({ ...settlementTime });
+      }
+      if (section === 'habits') {
+        setTempHabits([...habits]);
+      }
+      setSettingsEditingSection(section);
+    };
+
     if (settingsEditingSection && settingsEditingSection !== section) {
-      if (!window.confirm('目前有未儲存的編輯，切換區塊將放棄變更。確定嗎？')) return;
-    }
-    setIconPickerOpenId(null);
-    if (section === 'guidance') {
-      const next = [...guidanceQuotes];
-      prevDraftGuidanceCount.current = next.length;
-      setDraftGuidanceQuotes(next);
-    }
-    if (section === 'failures') {
-      const copy = failureTypes.map((ft) => ({ ...ft }));
-      prevDraftFailureCount.current = copy.length;
-      setDraftFailureTypes(copy);
-    }
-    if (section === 'stats') {
-      setDraftStatTargets({
-        contacts: { ...statTargets.contacts },
-        gatherings: { ...statTargets.gatherings },
-        strangers: { ...statTargets.strangers },
+      openConfirm({
+        title: '放棄未儲存變更？',
+        message: '切換區塊將放棄目前尚未儲存的編輯。',
+        confirmText: '放棄',
+        cancelText: '取消',
+        onConfirm: () => {
+          closeConfirm();
+          doBegin();
+        },
       });
+      return;
     }
-    if (section === 'settlement') {
-      setDraftSettlementTime({ ...settlementTime });
-    }
-    if (section === 'habits') {
-      setTempHabits([...habits]);
-    }
-    setSettingsEditingSection(section);
+
+    doBegin();
   };
 
   const cancelSettingsEdit = () => {
@@ -2050,9 +2091,17 @@ function AppInner() {
   };
 
   const saveStatsSection = () => {
-    if (!window.confirm('確定要儲存今日比賽數據設定嗎？')) return;
-    setStatTargets(normalizeStatTargets(draftStatTargets));
-    cancelSettingsEdit();
+    openConfirm({
+      title: '儲存設定',
+      message: '確定要儲存今日比賽數據設定嗎？',
+      confirmText: '儲存',
+      cancelText: '取消',
+      onConfirm: () => {
+        setStatTargets(normalizeStatTargets(draftStatTargets));
+        cancelSettingsEdit();
+        closeConfirm();
+      },
+    });
   };
 
   const saveSettlementSection = () => {
@@ -2074,7 +2123,10 @@ function AppInner() {
       ...prev,
       [key]: {
         ...prev[key],
-        [field]: field === 'target' ? Math.max(1, Math.min(99999, Number(val) || 1)) : String(val).slice(0, 32),
+        [field]:
+          field === 'target'
+            ? (String(val) === '' ? '' : Math.max(1, Math.min(99999, Number(val) || 1)))
+            : String(val).slice(0, 32),
       },
     }));
   };
@@ -2522,6 +2574,38 @@ function AppInner() {
               <p className="mt-6 text-3xl font-black text-amber-300 tabular-nums drop-shadow-[0_0_18px_rgba(251,191,36,0.45)]">
                 +{recentExpGain} EXP
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* --- 統一風格確認視窗 --- */}
+        {confirmModal.open && (
+          <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/55 backdrop-blur-sm px-6 pt-safe pb-safe">
+            <div className="w-full max-w-md rounded-3xl border border-white/20 bg-white shadow-2xl overflow-hidden">
+              <div className="p-5">
+                <p className="text-sm font-black text-slate-900">{confirmModal.title}</p>
+                <p className="mt-2 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{confirmModal.message}</p>
+              </div>
+              <div className="flex gap-2 px-5 pb-5">
+                <button
+                  type="button"
+                  onClick={closeConfirm}
+                  className="flex-1 py-3 rounded-2xl border border-slate-200 text-slate-700 font-black md:hover:bg-slate-50 active:scale-[0.99] transition-all"
+                >
+                  {confirmModal.cancelText}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fn = confirmActionRef.current;
+                    if (fn) fn();
+                    else closeConfirm();
+                  }}
+                  className="flex-1 py-3 rounded-2xl bg-slate-900 text-white font-black md:hover:bg-slate-800 active:scale-[0.99] transition-all"
+                >
+                  {confirmModal.confirmText}
+                </button>
+              </div>
             </div>
           </div>
         )}
