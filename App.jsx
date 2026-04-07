@@ -576,7 +576,7 @@ class ErrorBoundary extends React.Component {
       <div className="min-h-screen bg-slate-50 font-sans text-slate-800 p-6">
         <div className="max-w-md mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 p-5">
           <p className="text-sm font-black text-slate-800 mb-2">頁面載入失敗</p>
-          <p className="text-xs text-slate-500 mb-4">請重新整理頁面；若仍無法顯示，建議用無痕模式開啟。</p>
+          <p className="text-xs text-slate-500 mb-4">請按下方重新整理。你的紀錄存在本機瀏覽器，重新整理不會清空資料。</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
@@ -917,6 +917,17 @@ function AppInner() {
     };
   }, [businessRecords, todayStats]);
 
+  const getDayMilestones = (stats) => {
+    const c = Number(stats.contacts) >= statTargets.contacts.target;
+    const g = Number(stats.gatherings) >= statTargets.gatherings.target;
+    const s = Number(stats.strangers) >= statTargets.strangers.target;
+    const metCount = [c, g, s].filter(Boolean).length;
+    return {
+      doubleDouble: metCount >= 2,
+      tripleDouble: metCount === 3,
+    };
+  };
+
   const milestoneCounts = useMemo(() => {
     const all = [...businessRecords, todayStats];
     return all.reduce(
@@ -1115,17 +1126,6 @@ function AppInner() {
     if (count >= 2) exp += 3;
     if (count === 3) exp += 10;
     return exp;
-  };
-
-  const getDayMilestones = (stats) => {
-    const c = Number(stats.contacts) >= statTargets.contacts.target;
-    const g = Number(stats.gatherings) >= statTargets.gatherings.target;
-    const s = Number(stats.strangers) >= statTargets.strangers.target;
-    const metCount = [c, g, s].filter(Boolean).length;
-    return {
-      doubleDouble: metCount >= 2,
-      tripleDouble: metCount === 3,
-    };
   };
 
   const updateHistory = (index, field, value) => {
