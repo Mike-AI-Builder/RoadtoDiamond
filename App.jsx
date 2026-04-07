@@ -10,11 +10,7 @@ import {
 } from 'lucide-react';
 
 // --- Data Constants ---
-const DEFAULT_HABITS = [
-  "主動搭話", "保養", "寫感恩日記",
-  "寫反思日記", "每日睡前看書", "1點前睡",
-  "不賴床", "不抽煙", "不喝五十嵐"
-];
+const DEFAULT_HABITS = Array(9).fill('');
 
 // 每日指引句子庫（隨機抽取）
 const DAILY_GUIDANCE_QUOTES = [
@@ -354,9 +350,9 @@ const SAVE_VERSION = 3;
 const DEFAULT_SETTLEMENT_TIME = { hour: 4, minute: 0 };
 
 const DEFAULT_STAT_TARGETS = {
-  contacts: { label: '聯絡人數', target: 10 },
-  gatherings: { label: '聚會場次', target: 3 },
-  strangers: { label: '認識人數', target: 1 },
+  contacts: { label: '', target: 1 },
+  gatherings: { label: '', target: 1 },
+  strangers: { label: '', target: 1 },
 };
 
 function formatLocalYMD(d) {
@@ -398,6 +394,19 @@ function normalizeStatTargets(s) {
     gatherings: pick('gatherings', DEFAULT_STAT_TARGETS.gatherings),
     strangers: pick('strangers', DEFAULT_STAT_TARGETS.strangers),
   };
+}
+
+function isStatTargetsConfigured(t) {
+  return (
+    !!t &&
+    typeof t === 'object' &&
+    typeof t.contacts?.label === 'string' &&
+    typeof t.gatherings?.label === 'string' &&
+    typeof t.strangers?.label === 'string' &&
+    t.contacts.label.trim().length > 0 &&
+    t.gatherings.label.trim().length > 0 &&
+    t.strangers.label.trim().length > 0
+  );
 }
 
 function getNextGameDayKey(dayStr) {
@@ -842,6 +851,8 @@ function AppInner() {
   const [guidanceRevealNonce, setGuidanceRevealNonce] = useState(0);
   const guidanceDrawTimerRef = useRef(null);
 
+  const statsConfigured = useMemo(() => isStatTargetsConfigured(statTargets), [statTargets]);
+
   useEffect(() => {
     const gk = getGameDayKey(new Date(), settlementTime);
     setGuidanceDaily((prev) => (prev.dayKey === gk ? prev : { dayKey: gk, draws: [] }));
@@ -1175,6 +1186,7 @@ function AppInner() {
   }, [bingoStats.isWin, statRewards.all, hasPerfectDayToday]);
 
   const handlePointerDown = (type) => {
+    if (!statsConfigured) return;
     isLongPress.current = false;
     pressTimer.current = setTimeout(() => {
       isLongPress.current = true;
@@ -1192,6 +1204,7 @@ function AppInner() {
   };
 
   const handleStatClick = (type, e) => {
+    if (!statsConfigured) return;
     if (isLongPress.current) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1207,6 +1220,7 @@ function AppInner() {
   };
 
   const syncStatRewards = (newStats, eventX = window.innerWidth / 2, eventY = window.innerHeight * 0.4) => {
+    if (!statsConfigured) return;
     let expChange = 0;
     let newRewards = { ...statRewards };
     let animTexts = [];
@@ -1268,6 +1282,7 @@ function AppInner() {
 
   const toggleGrid = (index, e) => {
     if (bingoStats.isWin && !isAdjustingBingoAfterWin) return;
+    if (!habits[index] || !String(habits[index]).trim()) return;
     const newGrid = [...gridState];
     const isChecking = !newGrid[index];
     newGrid[index] = isChecking;
@@ -1537,7 +1552,7 @@ function AppInner() {
                 onPointerDown={() => handlePointerDown('contacts')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('contacts', e)}
                 className="bg-emerald-50 md:hover:bg-emerald-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-emerald-100 select-none shadow-sm relative"
               >
-                <span className="text-xs font-bold text-emerald-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.contacts.label}</span>
+                <span className="text-xs font-bold text-emerald-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.contacts.label || '未設定'}</span>
                 <span className="text-2xl font-black text-emerald-600 leading-none">{todayStats.contacts}</span>
                 <span className="text-[10px] text-emerald-400 mt-1">/ {statTargets.contacts.target}</span>
               </button>
@@ -1546,7 +1561,7 @@ function AppInner() {
                 onPointerDown={() => handlePointerDown('gatherings')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('gatherings', e)}
                 className="bg-blue-50 md:hover:bg-blue-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-blue-100 select-none shadow-sm relative"
               >
-                <span className="text-xs font-bold text-blue-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.gatherings.label}</span>
+                <span className="text-xs font-bold text-blue-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.gatherings.label || '未設定'}</span>
                 <span className="text-2xl font-black text-blue-600 leading-none">{todayStats.gatherings}</span>
                 <span className="text-[10px] text-blue-400 mt-1">/ {statTargets.gatherings.target}</span>
               </button>
@@ -1555,7 +1570,7 @@ function AppInner() {
                 onPointerDown={() => handlePointerDown('strangers')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('strangers', e)}
                 className="bg-purple-50 md:hover:bg-purple-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-purple-100 select-none shadow-sm relative"
               >
-                <span className="text-xs font-bold text-purple-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.strangers.label}</span>
+                <span className="text-xs font-bold text-purple-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.strangers.label || '未設定'}</span>
                 <span className="text-2xl font-black text-purple-600 leading-none">{todayStats.strangers}</span>
                 <span className="text-[10px] text-purple-400 mt-1">/ {statTargets.strangers.target}</span>
               </button>
@@ -1614,7 +1629,9 @@ function AppInner() {
                 `}
               >
                 <>
-                  <span className="text-xs md:text-sm font-medium z-10 break-words w-full line-clamp-3 leading-tight">{habit}</span>
+                  <span className={`text-xs md:text-sm font-medium z-10 break-words w-full line-clamp-3 leading-tight ${habit ? '' : 'text-slate-400'}`}>
+                    {habit || '未設定'}
+                  </span>
                   {gridState[index] && (
                     <div className="absolute top-2 right-2 text-indigo-400">
                       <Check size={16} />
