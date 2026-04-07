@@ -768,6 +768,7 @@ function AppInner() {
   const [streak, setStreak] = useState(INITIAL_GAME.streak);
   const [hasWonToday, setHasWonToday] = useState(INITIAL_GAME.hasWonToday);
   const [hasPerfectDayToday, setHasPerfectDayToday] = useState(INITIAL_GAME.hasPerfectDayToday);
+  const [isAdjustingBingoAfterWin, setIsAdjustingBingoAfterWin] = useState(false);
 
   // --- Failures State ---
   const [failures, setFailures] = useState(INITIAL_GAME.failures);
@@ -824,6 +825,7 @@ function AppInner() {
   const hasPerfectDayTodayRef = useRef(INITIAL_GAME.hasPerfectDayToday);
   const statRewardsRef = useRef(INITIAL_GAME.statRewards);
   const guidanceDailyRef = useRef(INITIAL_GAME.guidanceDaily);
+  const lastWinMilestoneBonusRef = useRef(0);
 
   // --- Animation State ---
   const [showFullWinAnim, setShowFullWinAnim] = useState(false);
@@ -1143,9 +1145,23 @@ function AppInner() {
       setTimeout(() => setShowFullWinAnim(false), 3000);
       
       const bonus = getStreakMilestoneBonus(newStreak);
+      lastWinMilestoneBonusRef.current = bonus;
       if (bonus > 0) setBaseExp((prev) => prev + bonus);
     }
   }, [bingoStats.isWin, hasWonToday, streak]);
+
+  useEffect(() => {
+    if (!hasWonToday) return;
+    if (bingoStats.isWin) return;
+    setHasWonToday(false);
+    setIsAdjustingBingoAfterWin(false);
+    setStreak((prev) => Math.max(0, prev - 1));
+    const rollback = Number(lastWinMilestoneBonusRef.current) || 0;
+    if (rollback > 0) {
+      setBaseExp((prev) => Math.max(0, prev - rollback));
+      lastWinMilestoneBonusRef.current = 0;
+    }
+  }, [bingoStats.isWin, hasWonToday]);
 
   useEffect(() => {
     if (bingoStats.isWin && statRewards.all && !hasPerfectDayToday) {
@@ -1251,6 +1267,7 @@ function AppInner() {
   };
 
   const toggleGrid = (index, e) => {
+    if (bingoStats.isWin && !isAdjustingBingoAfterWin) return;
     const newGrid = [...gridState];
     const isChecking = !newGrid[index];
     newGrid[index] = isChecking;
@@ -1570,9 +1587,18 @@ function AppInner() {
           </div>
 
           {bingoStats.isWin && (
-             <p className="relative z-10 text-green-600 text-sm font-bold flex items-center justify-center gap-1 bg-green-50 py-1.5 rounded-lg border border-green-100">
-               <Sparkles size={16}/> 恭喜贏下今日比賽！
-             </p>
+            <div className="relative z-10 flex items-center justify-between gap-2 bg-green-50 py-2 px-3 rounded-lg border border-green-100">
+              <p className="text-green-700 text-sm font-black flex items-center gap-1">
+                <Sparkles size={16}/> 今日已獲勝
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsAdjustingBingoAfterWin((v) => !v)}
+                className="shrink-0 bg-white text-green-700 border border-green-200 px-3 py-1.5 rounded-lg text-xs font-black active:scale-[0.99] transition-all"
+              >
+                {isAdjustingBingoAfterWin ? '完成' : '修正'}
+              </button>
+            </div>
           )}
 
           <div className="relative z-10 grid grid-cols-3 gap-2 md:gap-3 mt-1">
@@ -2451,11 +2477,17 @@ function AppInner() {
         {showCelebrate && (
           <div
             className="fixed inset-0 z-[220] flex items-center justify-center bg-indigo-900/85 backdrop-blur-md px-6 pt-safe pb-safe"
-            onClick={() => setShowCelebrate(false)}
+            onClick={() => {
+              setShowCelebrate(false);
+              setPendingCelebrate(null);
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') setShowCelebrate(false);
+              if (e.key === 'Enter' || e.key === ' ') {
+                setShowCelebrate(false);
+                setPendingCelebrate(null);
+              }
             }}
           >
             <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
