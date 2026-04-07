@@ -392,11 +392,23 @@ function formatFailureRecordedAt(iso) {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',
       hour12: false,
     });
   } catch {
     return '—';
+  }
+}
+
+function updateIsoDateKeepTime(iso, ymd) {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    const [y, m, day] = String(ymd || '').split('-').map((x) => Number(x));
+    if (!y || !m || !day) return iso;
+    d.setFullYear(y, m - 1, day);
+    return d.toISOString();
+  } catch {
+    return iso;
   }
 }
 
@@ -539,10 +551,11 @@ export default function App() {
 
   // --- Failures State ---
   const [failures, setFailures] = useState(INITIAL_GAME.failures);
-  const [customFailureText, setCustomFailureText] = useState("");
   const [showCelebrate, setShowCelebrate] = useState(false);
   const [recentExpGain, setRecentExpGain] = useState(0);
   const [failureQuote, setFailureQuote] = useState("");
+  const [editingFailureId, setEditingFailureId] = useState(null);
+  const [draftFailureDate, setDraftFailureDate] = useState('');
 
   // --- Stats State ---
   const [businessRecords, setBusinessRecords] = useState(INITIAL_GAME.businessRecords);
@@ -1010,8 +1023,6 @@ export default function App() {
     setBaseExp(prev => prev + typeObj.exp);
     setRecentExpGain(typeObj.exp);
     setShowCelebrate(true);
-    setCustomFailureText("");
-    
     setTimeout(() => setShowCelebrate(false), 3000);
   };
 
@@ -1090,25 +1101,22 @@ export default function App() {
     return (
       <div className="space-y-5 animate-fadeIn pb-6">
         {/* Player Profile / Level Card */}
-        <div className={`bg-gradient-to-br ${cardStyle.bg} rounded-3xl p-6 shadow-lg text-white relative overflow-hidden transition-all duration-500`}>
-          <div className="absolute top-0 right-0 p-2 opacity-10"><Award size={120} /></div>
+        <div className={`bg-gradient-to-br ${cardStyle.bg} rounded-2xl p-4 shadow-lg text-white relative overflow-hidden transition-all duration-500`}>
           
           <div className="flex justify-between items-center mb-4 relative z-10">
              <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold tracking-wider border border-white/10">
                LV.{level}
              </span>
-             <div className="text-right">
-                <p className="text-white/70 text-[10px] leading-tight mb-0.5">總經驗值</p>
-                <p className="font-bold text-sm leading-tight">{totalExp} <span className="text-[10px] font-normal">EXP</span></p>
-             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center mb-6 relative z-10">
-             <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center shadow-inner border border-white/20 mb-3">
-                <Gem size={32} className={cardStyle.icon} />
+          <div className="flex flex-col items-center justify-center mb-5 relative z-10">
+             <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center shadow-inner border border-white/20 mb-3 px-2">
+                <span className="text-center text-[11px] font-black leading-tight tracking-wide text-white/95 drop-shadow-sm line-clamp-2">
+                  {currentTitle}
+                </span>
              </div>
-             <h2 className={`text-3xl font-black bg-clip-text text-transparent bg-gradient-to-b ${cardStyle.text} leading-tight text-center tracking-wider drop-shadow-sm`}>
-                {currentTitle}
+             <h2 className={`text-2xl font-black bg-clip-text text-transparent bg-gradient-to-b ${cardStyle.text} leading-tight text-center tracking-wider drop-shadow-sm`}>
+               鑽石之路
              </h2>
           </div>
 
@@ -1365,33 +1373,13 @@ export default function App() {
           })}
         </div>
 
-        <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-indigo-100">
-          <p className="text-xs text-gray-500 font-medium text-left ml-1">其他想紀錄的情境（+1 EXP）</p>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              value={customFailureText}
-              onChange={(e) => setCustomFailureText(e.target.value)}
-              placeholder="簡短描述這次的狀況…"
-              className="flex-1 px-4 py-2 rounded-xl border-none shadow-inner bg-white/80 focus:bg-white focus:ring-2 focus:ring-indigo-300 outline-none transition-all text-sm"
-            />
-            <button 
-              onClick={() => {
-                if(!customFailureText) return;
-                recordFailure({ label: '自訂', exp: 1 }, customFailureText);
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 rounded-xl transition-all shadow-md active:scale-95 whitespace-nowrap text-sm"
-            >
-              記錄
-            </button>
-          </div>
-        </div>
-
         <div className="mt-5 pt-4 border-t border-indigo-100 text-left">
-          <p className="text-xs text-gray-500 font-medium mb-2 ml-0.5">紀錄列表 · 每次按下類型或「記錄」的時間會顯示在下方，可刪除單筆（會一併扣回該筆 EXP）</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-bold text-gray-700">記錄列表</p>
+          </div>
           {failures.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-6 bg-white/50 rounded-xl border border-dashed border-indigo-100">
-              尚無紀錄，點擊上方類型或填寫自訂情境開始累積
+              尚無紀錄，點擊上方類型開始累積
             </p>
           ) : (
             <ul className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
@@ -1408,7 +1396,65 @@ export default function App() {
                     <p className="text-[10px] text-amber-600 font-bold mt-1">
                       +{f.exp} EXP · {f.label}
                     </p>
+                    {editingFailureId === f.id && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <input
+                          type="date"
+                          value={draftFailureDate}
+                          onChange={(e) => setDraftFailureDate(e.target.value)}
+                          className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-700"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextDate = draftFailureDate || f.date;
+                            setFailures((prev) =>
+                              prev.map((x) =>
+                                x.id === f.id
+                                  ? {
+                                      ...x,
+                                      date: nextDate,
+                                      recordedAt: updateIsoDateKeepTime(x.recordedAt, nextDate),
+                                    }
+                                  : x
+                              )
+                            );
+                            setEditingFailureId(null);
+                            setDraftFailureDate('');
+                          }}
+                          className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-white hover:bg-slate-700"
+                        >
+                          儲存
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingFailureId(null);
+                            setDraftFailureDate('');
+                          }}
+                          className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editingFailureId === f.id) {
+                        setEditingFailureId(null);
+                        setDraftFailureDate('');
+                        return;
+                      }
+                      setEditingFailureId(f.id);
+                      setDraftFailureDate(f.date || f.recordedAt.split('T')[0]);
+                    }}
+                    className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                    aria-label="修正日期"
+                  >
+                    <Edit3 size={18} />
+                  </button>
                   <button
                     type="button"
                     onClick={() => removeFailure(f.id)}
@@ -1634,6 +1680,10 @@ export default function App() {
       </div>
     );
 
+    const collapsedHint = (
+      <p className="text-sm text-slate-400">已收合，按右上角鉛筆開始修正。</p>
+    );
+
     return (
       <div className="space-y-5 animate-fadeIn pb-8">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1675,17 +1725,7 @@ export default function App() {
               {editActions(saveGuidanceSection)}
             </>
           ) : (
-            <ul className="space-y-2">
-              {guidanceQuotes.length === 0 ? (
-                <p className="text-sm text-slate-400">尚無內容，請按鉛筆圖示編輯。</p>
-              ) : (
-                guidanceQuotes.map((q, i) => (
-                  <li key={`gqv-${i}`} className="text-sm text-slate-700 border-b border-slate-100 pb-2 last:border-0 whitespace-pre-wrap">
-                    {q || '（空白）'}
-                  </li>
-                ))
-              )}
-            </ul>
+            collapsedHint
           )}
         </div>
 
@@ -1788,22 +1828,7 @@ export default function App() {
               {editActions(saveFailuresSection)}
             </>
           ) : (
-            <ul className="space-y-2">
-              {failureTypes.length === 0 ? (
-                <p className="text-sm text-slate-400">尚無項目，請按鉛筆圖示編輯。</p>
-              ) : (
-                failureTypes.map((ft) => {
-                  const IconComp = ICON_MAP[ft.iconKey] || Mail;
-                  return (
-                    <li key={ft.id} className="flex items-center gap-2 text-sm text-slate-700 border-b border-slate-100 pb-2 last:border-0">
-                      <IconComp size={18} className="text-slate-500 shrink-0" />
-                      <span className="flex-1">{ft.label}</span>
-                      <span className="text-slate-400 tabular-nums">+{ft.exp}</span>
-                    </li>
-                  );
-                })
-              )}
-            </ul>
+            collapsedHint
           )}
         </div>
 
@@ -1833,14 +1858,7 @@ export default function App() {
               {editActions(saveStatsSection)}
             </>
           ) : (
-            <ul className="space-y-2 text-sm text-slate-700">
-              {(['contacts', 'gatherings', 'strangers']).map((key) => (
-                <li key={key} className="flex justify-between border-b border-slate-100 pb-2 last:border-0">
-                  <span>{statTargets[key].label}</span>
-                  <span className="text-slate-500 tabular-nums">目標 {statTargets[key].target}</span>
-                </li>
-              ))}
-            </ul>
+            collapsedHint
           )}
         </div>
 
@@ -1863,7 +1881,7 @@ export default function App() {
               {editActions(saveSettlementSection)}
             </>
           ) : (
-            <p className="text-lg font-medium text-slate-800 tabular-nums">{settlementDisplay}</p>
+            collapsedHint
           )}
         </div>
       </div>
