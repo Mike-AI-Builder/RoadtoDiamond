@@ -6,7 +6,7 @@ import {
   Home, Crosshair,
   CalendarClock, Presentation, Phone, RefreshCw, GitBranch, Megaphone,
   Mail, CalendarRange, CalendarOff, Mic2, Headphones, Package, LogOut,
-  Gem, BarChart2
+  Gem, BarChart2, Trash2
 } from 'lucide-react';
 
 // --- Data Constants ---
@@ -180,6 +180,46 @@ function getTodayKey() {
   return new Date().toISOString().split('T')[0];
 }
 
+function normalizeFailures(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((f, i) => {
+    const exp = Number(f.exp) || 0;
+    const date = typeof f.date === 'string' ? f.date : '';
+    const recordedAt =
+      typeof f.recordedAt === 'string'
+        ? f.recordedAt
+        : date
+          ? `${date}T12:00:00.000Z`
+          : new Date(0).toISOString();
+    return {
+      id: f.id != null ? f.id : `legacy-${i}-${recordedAt}`,
+      label: typeof f.label === 'string' ? f.label : '自訂',
+      text: typeof f.text === 'string' ? f.text : '',
+      exp,
+      date: date || recordedAt.split('T')[0],
+      recordedAt,
+    };
+  });
+}
+
+function formatFailureRecordedAt(iso) {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return '—';
+  }
+}
+
 function initialCompletedLineCount(grid) {
   let completedLines = 0;
   WIN_LINES.forEach((line) => {
@@ -236,7 +276,7 @@ function loadPersistedGameState() {
       streak: typeof d.streak === 'number' && d.streak >= 0 ? d.streak : 0,
       hasWonToday: newDay ? false : !!d.hasWonToday,
       hasPerfectDayToday: newDay ? false : !!d.hasPerfectDayToday,
-      failures: Array.isArray(d.failures) ? d.failures : [],
+      failures: normalizeFailures(d.failures),
       businessRecords: Array.isArray(d.businessRecords) ? d.businessRecords : [],
       todayStats: newDay
         ? { contacts: 0, gatherings: 0, strangers: 0 }
@@ -622,13 +662,19 @@ export default function App() {
 
   const recordFailure = (typeObj, customText = "") => {
     const textToSave = customText || typeObj.label;
-    setFailures([{ 
-      id: Date.now(), 
-      label: typeObj.label, 
-      text: textToSave, 
-      exp: typeObj.exp, 
-      date: new Date().toISOString().split('T')[0] 
-    }, ...failures]);
+    const now = new Date();
+    const day = now.toISOString().split('T')[0];
+    setFailures([
+      {
+        id: `${now.getTime()}-${Math.random().toString(36).slice(2, 9)}`,
+        label: typeObj.label,
+        text: textToSave,
+        exp: typeObj.exp,
+        date: day,
+        recordedAt: now.toISOString(),
+      },
+      ...failures,
+    ]);
     
     const randomQuote = FAILURE_QUOTES[Math.floor(Math.random() * FAILURE_QUOTES.length)];
     setFailureQuote(randomQuote);
@@ -639,6 +685,13 @@ export default function App() {
     setCustomFailureText("");
     
     setTimeout(() => setShowCelebrate(false), 3000);
+  };
+
+  const removeFailure = (id) => {
+    const item = failures.find((f) => f.id === id);
+    if (!item) return;
+    setFailures((prev) => prev.filter((f) => f.id !== id));
+    setBaseExp((prev) => Math.max(0, prev - item.exp));
   };
 
   const calculateDayExp = (stats) => {
@@ -940,12 +993,14 @@ export default function App() {
     <div className="space-y-6 animate-fadeIn">
       <div className="bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 rounded-3xl p-6 text-center border border-indigo-100 relative overflow-hidden">
         <h2 className="text-2xl font-bold text-gray-800 mb-1">學習紀錄</h2>
-        <div className="flex justify-center mb-3">
+        <p className="text-gray-600 text-sm mb-3 leading-relaxed px-1">
+          失敗為成功之母，每次失敗都是一次學習，把它們記錄下來，賺取經驗值！
+        </p>
+        <div className="flex justify-center mb-4">
            <span className="bg-white text-indigo-700 font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-1.5 shadow-sm border border-indigo-100">
              <Sparkles size={16} className="text-amber-500" /> 累計紀錄：{failures.length} 次
            </span>
         </div>
-        <p className="text-gray-600 text-sm mb-4">把當下的情境記下來，轉成經驗值，下一步會更清楚。</p>
         
         {showCelebrate && (
           <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center animate-fadeIn p-6">
@@ -992,6 +1047,42 @@ export default function App() {
               記錄
             </button>
           </div>
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-indigo-100 text-left">
+          <p className="text-xs text-gray-500 font-medium mb-2 ml-0.5">紀錄列表 · 每次按下類型或「記錄」的時間會顯示在下方，可刪除單筆（會一併扣回該筆 EXP）</p>
+          {failures.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6 bg-white/50 rounded-xl border border-dashed border-indigo-100">
+              尚無紀錄，點擊上方類型或填寫自訂情境開始累積
+            </p>
+          ) : (
+            <ul className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
+              {failures.map((f) => (
+                <li
+                  key={f.id}
+                  className="flex items-start gap-2 bg-white/90 rounded-xl border border-indigo-100/80 px-3 py-2.5 shadow-sm"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-indigo-500 font-mono tabular-nums">
+                      {formatFailureRecordedAt(f.recordedAt)}
+                    </p>
+                    <p className="text-sm font-bold text-gray-800 mt-0.5 break-words">{f.text}</p>
+                    <p className="text-[10px] text-amber-600 font-bold mt-1">
+                      +{f.exp} EXP · {f.label}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFailure(f.id)}
+                    className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                    aria-label="刪除此筆學習紀錄"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>
