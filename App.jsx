@@ -1051,12 +1051,16 @@ function AppInner() {
     setFailureQuote(pendingCelebrate.quote);
     setRecentExpGain(pendingCelebrate.exp);
     setShowCelebrate(true);
+  }, [pendingCelebrate, showLevelUpAnim, showCelebrate]);
+
+  useEffect(() => {
+    if (!showCelebrate) return;
     const t = setTimeout(() => {
       setShowCelebrate(false);
       setPendingCelebrate(null);
     }, 2400);
     return () => clearTimeout(t);
-  }, [pendingCelebrate, showLevelUpAnim, showCelebrate]);
+  }, [showCelebrate]);
 
   useEffect(() => {
     if (bingoStats.completedLines > prevLines) {
@@ -1633,7 +1637,7 @@ function AppInner() {
         </div>
         
         {showCelebrate && (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center bg-indigo-900/85 backdrop-blur-md">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-indigo-900/85 backdrop-blur-md">
             <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
               <div className="w-[150vw] h-[150vw] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.10)_350deg,transparent_360deg)] anim-spin-slow opacity-60 rounded-full"></div>
               <div className="w-[100vw] h-[100vw] border-[4vw] border-dashed border-white/10 rounded-full anim-spin-slow absolute opacity-40"></div>
