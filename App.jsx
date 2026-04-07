@@ -6,7 +6,7 @@ import {
   Home, Crosshair,
   CalendarClock, Presentation, Phone, RefreshCw, GitBranch, Megaphone,
   Mail, CalendarRange, CalendarOff, Mic2, Headphones, Package, LogOut,
-  Gem, BarChart2, Trash2
+  Gem, BarChart2, Trash2, Database, Plus
 } from 'lucide-react';
 
 // --- Data Constants ---
@@ -88,6 +88,25 @@ const FAILURE_TYPES = [
   { label: '發展型下線不做了', exp: 100, icon: GitBranch },
 ];
 
+const FAILURE_ICON_KEYS = [
+  'Mail', 'CalendarRange', 'RefreshCw', 'CalendarClock', 'Presentation', 'MessageCircle',
+  'Phone', 'Megaphone', 'CalendarOff', 'Mic2', 'Headphones', 'Package', 'LogOut', 'Users', 'GitBranch',
+];
+
+const ICON_MAP = {
+  Mail, CalendarRange, RefreshCw, CalendarClock, Presentation, MessageCircle,
+  Phone, Megaphone, CalendarOff, Mic2, Headphones, Package, LogOut, Users, GitBranch,
+};
+
+function buildDefaultFailureTypesData() {
+  return FAILURE_TYPES.map((t, i) => ({
+    id: `ft-def-${i}`,
+    label: t.label,
+    exp: t.exp,
+    iconKey: FAILURE_ICON_KEYS[i] || 'Mail',
+  }));
+}
+
 const FAILURE_QUOTES = [
   "每一段過程都是升級的資料點。",
   "寫下來，下一步會更有方向。",
@@ -166,7 +185,58 @@ const getStyleByTitle = (title) => {
 
 // --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
 const STORAGE_KEY = 'road-to-diamond-game-v1';
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
+
+/** 以本地時間每日 04:00 為「遊戲日」切換點 */
+function formatLocalYMD(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getGameDayKey(d = new Date()) {
+  const x = new Date(d);
+  if (x.getHours() < 4) {
+    x.setDate(x.getDate() - 1);
+  }
+  return formatLocalYMD(x);
+}
+
+function getNextGameDayKey(dayStr) {
+  const [y, m, d] = dayStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + 1);
+  return formatLocalYMD(dt);
+}
+
+function compareDayKeys(a, b) {
+  if (!a || !b) return 0;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function upsertBusinessRecord(records, date, stats) {
+  const contacts = Number(stats.contacts) || 0;
+  const gatherings = Number(stats.gatherings) || 0;
+  const strangers = Number(stats.strangers) || 0;
+  const idx = records.findIndex((r) => r.date === date);
+  if (idx >= 0) {
+    const copy = [...records];
+    copy[idx] = { ...copy[idx], contacts, gatherings, strangers };
+    return copy;
+  }
+  return [...records, { date, contacts, gatherings, strangers }];
+}
+
+function normalizeFailureTypesData(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return buildDefaultFailureTypesData();
+  return arr.map((f, i) => ({
+    id: typeof f.id === 'string' && f.id ? f.id : `ft-${i}`,
+    label: String(f.label || '').trim().slice(0, 120) || '未命名',
+    exp: Math.max(0, Math.min(99999, Number(f.exp) || 1)),
+    iconKey: typeof f.iconKey === 'string' && ICON_MAP[f.iconKey] ? f.iconKey : 'Mail',
+  }));
+}
 
 const DEFAULT_STAT_REWARDS = {
   contacts: false,
@@ -176,8 +246,85 @@ const DEFAULT_STAT_REWARDS = {
   all: false,
 };
 
-function getTodayKey() {
-  return new Date().toISOString().split('T')[0];
+function settleGameDaysBetween(saved, targetGameDay) {
+  let lp = saved.lastPlayDate || targetGameDay;
+  let gridState = Array.isArray(saved.gridState) && saved.gridState.length === 9
+    ? [...saved.gridState.map(Boolean)]
+    : Array(9).fill(false);
+  let todayStats = {
+    contacts: Number(saved.todayStats?.contacts) || 0,
+    gatherings: Number(saved.todayStats?.gatherings) || 0,
+    strangers: Number(saved.todayStats?.strangers) || 0,
+  };
+  let businessRecords = Array.isArray(saved.businessRecords) ? [...saved.businessRecords] : [];
+  let seasonRecord = {
+    wins: Number(saved.seasonRecord?.wins) || 0,
+    losses: Number(saved.seasonRecord?.losses) || 0,
+  };
+  let streak = typeof saved.streak === 'number' && saved.streak >= 0 ? saved.streak : 0;
+  let tripleDoubleStreak =
+    typeof saved.tripleDoubleStreak === 'number' && saved.tripleDoubleStreak >= 0
+      ? saved.tripleDoubleStreak
+      : 0;
+  let guidanceDaily = saved.guidanceDaily;
+
+  if (compareDayKeys(lp, targetGameDay) > 0) {
+    return {
+      ...saved,
+      lastPlayDate: targetGameDay,
+      gridState,
+      todayStats,
+      businessRecords,
+      seasonRecord,
+      streak,
+      statRewards: { ...DEFAULT_STAT_REWARDS, ...saved.statRewards },
+      guidanceDaily:
+        guidanceDaily?.dayKey === targetGameDay && Array.isArray(guidanceDaily?.draws)
+          ? guidanceDaily
+          : { dayKey: targetGameDay, draws: [] },
+    };
+  }
+
+  let crossed = false;
+  while (compareDayKeys(lp, targetGameDay) < 0) {
+    crossed = true;
+    const win = gridState.length === 9 && gridState.every(Boolean);
+    businessRecords = upsertBusinessRecord(businessRecords, lp, todayStats);
+    seasonRecord = {
+      wins: seasonRecord.wins + (win ? 1 : 0),
+      losses: seasonRecord.losses + (win ? 0 : 1),
+    };
+    if (!win) streak = 0;
+    lp = getNextGameDayKey(lp);
+    gridState = Array(9).fill(false);
+    todayStats = { contacts: 0, gatherings: 0, strangers: 0 };
+    tripleDoubleStreak = 0;
+  }
+
+  if (crossed) {
+    guidanceDaily = { dayKey: targetGameDay, draws: [] };
+  } else {
+    if (!guidanceDaily || typeof guidanceDaily !== 'object' || !Array.isArray(guidanceDaily.draws)) {
+      guidanceDaily = { dayKey: targetGameDay, draws: [] };
+    } else if (guidanceDaily.dayKey !== targetGameDay) {
+      guidanceDaily = { dayKey: targetGameDay, draws: [] };
+    }
+  }
+
+  return {
+    ...saved,
+    lastPlayDate: targetGameDay,
+    gridState,
+    todayStats,
+    businessRecords,
+    seasonRecord,
+    streak,
+    hasWonToday: crossed ? false : !!saved.hasWonToday,
+    hasPerfectDayToday: crossed ? false : !!saved.hasPerfectDayToday,
+    statRewards: crossed ? { ...DEFAULT_STAT_REWARDS } : { ...DEFAULT_STAT_REWARDS, ...saved.statRewards },
+    tripleDoubleStreak: crossed ? 0 : tripleDoubleStreak,
+    guidanceDaily,
+  };
 }
 
 function normalizeFailures(arr) {
@@ -229,7 +376,7 @@ function initialCompletedLineCount(grid) {
 }
 
 function createFreshGameState() {
-  const today = getTodayKey();
+  const today = getGameDayKey();
   return {
     baseExp: 0,
     seasonRecord: { wins: 0, losses: 0 },
@@ -244,6 +391,9 @@ function createFreshGameState() {
     statRewards: { ...DEFAULT_STAT_REWARDS },
     tripleDoubleStreak: 0,
     guidanceDaily: { dayKey: today, draws: [] },
+    lastPlayDate: today,
+    guidanceQuotes: [...DAILY_GUIDANCE_QUOTES],
+    failureTypes: buildDefaultFailureTypesData(),
   };
 }
 
@@ -252,51 +402,77 @@ function loadPersistedGameState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
-    if (d.v !== SAVE_VERSION) return null;
-    const today = getTodayKey();
-    const newDay = !d.lastPlayDate || d.lastPlayDate !== today;
-    let guidanceDaily = d.guidanceDaily;
-    if (!guidanceDaily || typeof guidanceDaily !== 'object' || !Array.isArray(guidanceDaily.draws)) {
-      guidanceDaily = { dayKey: today, draws: [] };
-    } else if (guidanceDaily.dayKey !== today) {
-      guidanceDaily = { dayKey: today, draws: [] };
-    }
+    const fileVersion = d.v ?? 1;
+    if (fileVersion > SAVE_VERSION) return null;
+
+    const targetGameDay = getGameDayKey();
+    const guidanceQuotes =
+      Array.isArray(d.guidanceQuotes) && d.guidanceQuotes.length > 0
+        ? d.guidanceQuotes.map((q) => String(q))
+        : [...DAILY_GUIDANCE_QUOTES];
+    const failureTypes = normalizeFailureTypesData(d.failureTypes);
+
     const habits =
       Array.isArray(d.habits) && d.habits.length === 9 ? [...d.habits] : [...DEFAULT_HABITS];
-    const gridOk = Array.isArray(d.gridState) && d.gridState.length === 9;
-    const gridState = newDay ? Array(9).fill(false) : gridOk ? d.gridState.map(Boolean) : Array(9).fill(false);
-    return {
-      baseExp: typeof d.baseExp === 'number' && d.baseExp >= 0 ? d.baseExp : 0,
+
+    const lastPlayDateLegacy =
+      typeof d.lastPlayDate === 'string' && d.lastPlayDate ? d.lastPlayDate : targetGameDay;
+
+    const rawSaved = {
+      lastPlayDate: lastPlayDateLegacy,
+      gridState:
+        Array.isArray(d.gridState) && d.gridState.length === 9
+          ? d.gridState.map(Boolean)
+          : Array(9).fill(false),
+      todayStats: {
+        contacts: Number(d.todayStats?.contacts) || 0,
+        gatherings: Number(d.todayStats?.gatherings) || 0,
+        strangers: Number(d.todayStats?.strangers) || 0,
+      },
+      businessRecords: Array.isArray(d.businessRecords) ? d.businessRecords : [],
       seasonRecord:
         d.seasonRecord && typeof d.seasonRecord === 'object'
           ? { wins: Number(d.seasonRecord.wins) || 0, losses: Number(d.seasonRecord.losses) || 0 }
           : { wins: 0, losses: 0 },
-      habits,
-      gridState,
       streak: typeof d.streak === 'number' && d.streak >= 0 ? d.streak : 0,
-      hasWonToday: newDay ? false : !!d.hasWonToday,
-      hasPerfectDayToday: newDay ? false : !!d.hasPerfectDayToday,
-      failures: normalizeFailures(d.failures),
-      businessRecords: Array.isArray(d.businessRecords) ? d.businessRecords : [],
-      todayStats: newDay
-        ? { contacts: 0, gatherings: 0, strangers: 0 }
-        : {
-            contacts: Number(d.todayStats?.contacts) || 0,
-            gatherings: Number(d.todayStats?.gatherings) || 0,
-            strangers: Number(d.todayStats?.strangers) || 0,
-          },
-      statRewards: newDay
-        ? { ...DEFAULT_STAT_REWARDS }
-        : {
-            contacts: !!d.statRewards?.contacts,
-            gatherings: !!d.statRewards?.gatherings,
-            strangers: !!d.statRewards?.strangers,
-            doubleDouble: !!d.statRewards?.doubleDouble,
-            all: !!d.statRewards?.all,
-          },
       tripleDoubleStreak:
-        typeof d.tripleDoubleStreak === 'number' && d.tripleDoubleStreak >= 0 ? d.tripleDoubleStreak : 0,
-      guidanceDaily,
+        typeof d.tripleDoubleStreak === 'number' && d.tripleDoubleStreak >= 0
+          ? d.tripleDoubleStreak
+          : 0,
+      hasWonToday: !!d.hasWonToday,
+      hasPerfectDayToday: !!d.hasPerfectDayToday,
+      statRewards:
+        d.statRewards && typeof d.statRewards === 'object'
+          ? {
+              contacts: !!d.statRewards.contacts,
+              gatherings: !!d.statRewards.gatherings,
+              strangers: !!d.statRewards.strangers,
+              doubleDouble: !!d.statRewards.doubleDouble,
+              all: !!d.statRewards.all,
+            }
+          : { ...DEFAULT_STAT_REWARDS },
+      guidanceDaily: d.guidanceDaily,
+    };
+
+    const settled = settleGameDaysBetween(rawSaved, targetGameDay);
+
+    return {
+      baseExp: typeof d.baseExp === 'number' && d.baseExp >= 0 ? d.baseExp : 0,
+      seasonRecord: settled.seasonRecord,
+      habits,
+      gridState: settled.gridState,
+      streak: settled.streak,
+      hasWonToday: settled.hasWonToday,
+      hasPerfectDayToday: settled.hasPerfectDayToday,
+      failures: normalizeFailures(d.failures),
+      businessRecords: settled.businessRecords,
+      todayStats: settled.todayStats,
+      statRewards: settled.statRewards,
+      tripleDoubleStreak: settled.tripleDoubleStreak,
+      guidanceDaily: settled.guidanceDaily,
+      lastPlayDate: settled.lastPlayDate,
+      guidanceQuotes,
+      failureTypes,
     };
   } catch {
     return null;
@@ -336,9 +512,22 @@ export default function App() {
   const [statRewards, setStatRewards] = useState(INITIAL_GAME.statRewards);
   const [tripleDoubleStreak, setTripleDoubleStreak] = useState(INITIAL_GAME.tripleDoubleStreak);
   
+  const [guidanceQuotes, setGuidanceQuotes] = useState(INITIAL_GAME.guidanceQuotes);
+  const [failureTypes, setFailureTypes] = useState(INITIAL_GAME.failureTypes);
+
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
-  const calendarDayRef = useRef(getTodayKey());
+  const lastPlayDateRef = useRef(INITIAL_GAME.lastPlayDate);
+  const gridStateRef = useRef(INITIAL_GAME.gridState);
+  const todayStatsRef = useRef(INITIAL_GAME.todayStats);
+  const businessRecordsRef = useRef(INITIAL_GAME.businessRecords);
+  const seasonRecordRef = useRef(INITIAL_GAME.seasonRecord);
+  const streakRef = useRef(INITIAL_GAME.streak);
+  const tripleDoubleStreakRef = useRef(INITIAL_GAME.tripleDoubleStreak);
+  const hasWonTodayRef = useRef(INITIAL_GAME.hasWonToday);
+  const hasPerfectDayTodayRef = useRef(INITIAL_GAME.hasPerfectDayToday);
+  const statRewardsRef = useRef(INITIAL_GAME.statRewards);
+  const guidanceDailyRef = useRef(INITIAL_GAME.guidanceDaily);
 
   // --- Animation State ---
   const [showFullWinAnim, setShowFullWinAnim] = useState(false);
@@ -356,16 +545,29 @@ export default function App() {
   const guidanceDrawTimerRef = useRef(null);
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    setGuidanceDaily((prev) => (prev.dayKey === today ? prev : { dayKey: today, draws: [] }));
+    const gk = getGameDayKey();
+    setGuidanceDaily((prev) => (prev.dayKey === gk ? prev : { dayKey: gk, draws: [] }));
   }, [activeTab]);
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    if (guidanceDaily.dayKey === today && guidanceDaily.draws.length === 0) {
+    const gk = getGameDayKey();
+    if (guidanceDaily.dayKey === gk && guidanceDaily.draws.length === 0) {
       setGuidanceRevealNonce(0);
     }
   }, [guidanceDaily.dayKey, guidanceDaily.draws.length]);
+
+  useEffect(() => {
+    gridStateRef.current = gridState;
+    todayStatsRef.current = todayStats;
+    businessRecordsRef.current = businessRecords;
+    seasonRecordRef.current = seasonRecord;
+    streakRef.current = streak;
+    tripleDoubleStreakRef.current = tripleDoubleStreak;
+    hasWonTodayRef.current = hasWonToday;
+    hasPerfectDayTodayRef.current = hasPerfectDayToday;
+    statRewardsRef.current = statRewards;
+    guidanceDailyRef.current = guidanceDaily;
+  });
 
   useEffect(() => {
     return () => {
@@ -376,7 +578,7 @@ export default function App() {
   useEffect(() => {
     const payload = {
       v: SAVE_VERSION,
-      lastPlayDate: getTodayKey(),
+      lastPlayDate: getGameDayKey(),
       baseExp,
       seasonRecord,
       habits,
@@ -390,6 +592,8 @@ export default function App() {
       statRewards,
       tripleDoubleStreak,
       guidanceDaily,
+      guidanceQuotes,
+      failureTypes,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -410,26 +614,47 @@ export default function App() {
     statRewards,
     tripleDoubleStreak,
     guidanceDaily,
+    guidanceQuotes,
+    failureTypes,
   ]);
 
   useEffect(() => {
-    const rollIfNewDay = () => {
-      const today = getTodayKey();
-      if (calendarDayRef.current === today) return;
-      calendarDayRef.current = today;
-      setHasWonToday(false);
-      setHasPerfectDayToday(false);
-      setGridState(Array(9).fill(false));
-      setTodayStats({ contacts: 0, gatherings: 0, strangers: 0 });
-      setStatRewards({ ...DEFAULT_STAT_REWARDS });
-      setGuidanceDaily({ dayKey: today, draws: [] });
-      setPrevLines(0);
+    const runSettlement = () => {
+      const target = getGameDayKey();
+      if (lastPlayDateRef.current === target) return;
+      const snap = {
+        lastPlayDate: lastPlayDateRef.current,
+        gridState: gridStateRef.current,
+        todayStats: todayStatsRef.current,
+        businessRecords: businessRecordsRef.current,
+        seasonRecord: seasonRecordRef.current,
+        streak: streakRef.current,
+        tripleDoubleStreak: tripleDoubleStreakRef.current,
+        hasWonToday: hasWonTodayRef.current,
+        hasPerfectDayToday: hasPerfectDayTodayRef.current,
+        statRewards: statRewardsRef.current,
+        guidanceDaily: guidanceDailyRef.current,
+      };
+      const settled = settleGameDaysBetween(snap, target);
+      setBusinessRecords(settled.businessRecords);
+      setSeasonRecord(settled.seasonRecord);
+      setStreak(settled.streak);
+      setGridState(settled.gridState);
+      setTodayStats(settled.todayStats);
+      setHasWonToday(settled.hasWonToday);
+      setHasPerfectDayToday(settled.hasPerfectDayToday);
+      setStatRewards(settled.statRewards);
+      setTripleDoubleStreak(settled.tripleDoubleStreak);
+      setGuidanceDaily(settled.guidanceDaily);
+      setPrevLines(initialCompletedLineCount(settled.gridState));
+      lastPlayDateRef.current = settled.lastPlayDate;
     };
-    const id = setInterval(rollIfNewDay, 60_000);
+    const id = setInterval(runSettlement, 60_000);
     const onVis = () => {
-      if (document.visibilityState === 'visible') rollIfNewDay();
+      if (document.visibilityState === 'visible') runSettlement();
     };
     document.addEventListener('visibilitychange', onVis);
+    runSettlement();
     return () => {
       clearInterval(id);
       document.removeEventListener('visibilitychange', onVis);
@@ -663,7 +888,7 @@ export default function App() {
   const recordFailure = (typeObj, customText = "") => {
     const textToSave = customText || typeObj.label;
     const now = new Date();
-    const day = now.toISOString().split('T')[0];
+    const day = getGameDayKey(now);
     setFailures([
       {
         id: `${now.getTime()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -726,16 +951,20 @@ export default function App() {
     }
   };
 
-  const guidanceTodayKey = new Date().toISOString().split('T')[0];
+  const guidanceTodayKey = getGameDayKey();
   const guidanceDrawsToday = guidanceDaily.dayKey === guidanceTodayKey ? guidanceDaily.draws : [];
   const guidanceRemainingToday = Math.max(0, GUIDANCE_DRAWS_PER_DAY - guidanceDrawsToday.length);
 
   const drawTodayGuidance = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getGameDayKey();
     setGuidanceDaily((prev) => {
       const base = prev.dayKey === today ? prev : { dayKey: today, draws: [] };
       if (base.draws.length >= GUIDANCE_DRAWS_PER_DAY) return base;
-      const quote = DAILY_GUIDANCE_QUOTES[Math.floor(Math.random() * DAILY_GUIDANCE_QUOTES.length)];
+      const pool = guidanceQuotes.map((q) => String(q).trim()).filter(Boolean);
+      const quote =
+        pool.length > 0
+          ? pool[Math.floor(Math.random() * pool.length)]
+          : '（請至「資料庫」分頁新增今日指引金句）';
       return { ...base, draws: [...base.draws, quote] };
     });
   };
@@ -1010,13 +1239,19 @@ export default function App() {
           </div>
         )}
 
+        {failureTypes.length === 0 && (
+          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl py-3 px-3 mb-4">
+            尚未設定快捷按鈕，請至下方「資料庫」分頁新增。
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-2 mb-4">
-          {FAILURE_TYPES.map((type, idx) => {
-            const IconComponent = type.icon;
+          {failureTypes.map((type) => {
+            const IconComponent = ICON_MAP[type.iconKey] || Mail;
             return (
               <button
-                key={idx}
-                onClick={() => recordFailure(type)}
+                key={type.id}
+                type="button"
+                onClick={() => recordFailure({ label: type.label, exp: type.exp })}
                 className="bg-white hover:bg-indigo-50 active:scale-95 transition-all p-3 rounded-xl border border-indigo-100 shadow-sm flex flex-col items-center justify-center gap-1"
               >
                 <div className="text-indigo-500 mb-1"><IconComponent size={24} /></div>
@@ -1091,7 +1326,18 @@ export default function App() {
   const renderStats = () => {
     return (
       <div className="space-y-6 animate-fadeIn pb-8">
-        
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+          <h3 className="font-bold text-gray-800 mb-1 flex items-center gap-2">
+            <Trophy size={18} className="text-amber-500" /> 今日比賽結算（04:00）
+          </h3>
+          <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+            每日本地 04:00 結算上一遊戲日：九宮格九格全達成計勝，否則計負；當日比賽數據會寫入下方歷史紀錄。
+          </p>
+          <p className="text-xl font-black text-indigo-700">
+            本季累計：{seasonRecord.wins} 勝 <span className="text-gray-400 font-bold">/</span> {seasonRecord.losses} 負
+          </p>
+        </div>
+
         {/* 本季平均數據 (移至上方, 最醒目) */}
         <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 shadow-lg text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 p-3 opacity-10">
@@ -1187,6 +1433,132 @@ export default function App() {
     );
   };
 
+  const renderDatabase = () => (
+    <div className="space-y-6 animate-fadeIn pb-8">
+      <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
+        <h2 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
+          <Database size={20} className="text-indigo-500" /> 今日指引金句
+        </h2>
+        <p className="text-xs text-gray-500 mb-4">管理金句庫；首頁「抽取今日指引」只會從這裡抽選。</p>
+        <ul className="space-y-2 max-h-64 overflow-y-auto">
+          {guidanceQuotes.map((q, i) => (
+            <li key={`gq-${i}`} className="flex gap-2">
+              <textarea
+                value={q}
+                onChange={(e) => {
+                  const next = [...guidanceQuotes];
+                  next[i] = e.target.value;
+                  setGuidanceQuotes(next);
+                }}
+                className="flex-1 text-sm rounded-xl border border-gray-200 p-2 min-h-[60px]"
+                rows={2}
+              />
+              <button
+                type="button"
+                onClick={() => setGuidanceQuotes(guidanceQuotes.filter((_, j) => j !== i))}
+                className="shrink-0 text-rose-500 p-2 rounded-lg hover:bg-rose-50"
+                aria-label="刪除此句"
+              >
+                <Trash2 size={18} />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={() => setGuidanceQuotes([...guidanceQuotes, ''])}
+          className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-indigo-200 text-indigo-600 font-bold text-sm"
+        >
+          <Plus size={18} /> 新增金句
+        </button>
+      </div>
+
+      <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
+        <h2 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
+          <Sparkles size={20} className="text-amber-500" /> 學習紀錄快捷按鈕
+        </h2>
+        <p className="text-xs text-gray-500 mb-4">自訂名稱、經驗值與圖示；學習紀錄頁會依此顯示快捷按鈕。</p>
+        <div className="space-y-3 max-h-80 overflow-y-auto">
+          {failureTypes.map((ft, i) => {
+            const IconComp = ICON_MAP[ft.iconKey] || Mail;
+            return (
+              <div key={ft.id} className="flex flex-col gap-2 border border-gray-100 rounded-xl p-3">
+                <div className="flex items-center gap-2">
+                  <IconComp size={20} className="text-indigo-500 shrink-0" />
+                  <input
+                    value={ft.label}
+                    onChange={(e) => {
+                      const next = [...failureTypes];
+                      next[i] = { ...ft, label: e.target.value };
+                      setFailureTypes(next);
+                    }}
+                    className="flex-1 text-sm font-bold border border-gray-200 rounded-lg px-2 py-1.5"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={99999}
+                    value={ft.exp}
+                    onChange={(e) => {
+                      const next = [...failureTypes];
+                      next[i] = { ...ft, exp: Math.max(0, Number(e.target.value) || 0) };
+                      setFailureTypes(next);
+                    }}
+                    className="w-16 text-sm text-center border border-gray-200 rounded-lg py-1.5"
+                  />
+                </div>
+                <div className="flex items-center gap-2 justify-between">
+                  <select
+                    value={ft.iconKey}
+                    onChange={(e) => {
+                      const next = [...failureTypes];
+                      next[i] = { ...ft, iconKey: e.target.value };
+                      setFailureTypes(next);
+                    }}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-2 flex-1"
+                  >
+                    {FAILURE_ICON_KEYS.map((k) => (
+                      <option key={k} value={k}>
+                        {k}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setFailureTypes(failureTypes.filter((_, j) => j !== i))}
+                    className="text-rose-500 p-2 rounded-lg hover:bg-rose-50"
+                    aria-label="刪除此按鈕"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            setFailureTypes([
+              ...failureTypes,
+              { id: `ft-${Date.now()}`, label: '新按鈕', exp: 1, iconKey: 'Mail' },
+            ])
+          }
+          className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-indigo-200 text-indigo-600 font-bold text-sm"
+        >
+          <Plus size={18} /> 新增按鈕
+        </button>
+      </div>
+
+      <div className="bg-slate-100 rounded-2xl p-4 text-xs text-slate-600 leading-relaxed">
+        <p className="font-bold text-slate-700 mb-1">每日結算（本地 04:00）</p>
+        <p>
+          以裝置本地時間每日 04:00 為「遊戲日」切換。結算時會把當日比賽數據寫入 Stats 歷史；九宮格九格全達成計一勝，否則計一負。跨日時會重置今日比賽數據與大三元相關狀態。
+        </p>
+      </div>
+    </div>
+  );
+
   // --- Main Layout ---
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
@@ -1211,6 +1583,7 @@ export default function App() {
           {activeTab === 'home' && renderHome()}
           {activeTab === 'failures' && renderFailures()}
           {activeTab === 'stats' && renderStats()}
+          {activeTab === 'database' && renderDatabase()}
         </main>
 
         {/* --- Global Animations Overlays --- */}
@@ -1288,25 +1661,30 @@ export default function App() {
         )}
 
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 w-full max-w-md bg-white border-t border-gray-100 px-2 py-3 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-50 rounded-t-3xl pb-safe">
-          <button onClick={() => setActiveTab('home')} className={`relative flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'home' ? 'text-indigo-600' : 'text-gray-400'}`}>
+        <nav className="fixed bottom-0 w-full max-w-md bg-white border-t border-gray-100 px-1 py-2 flex justify-between items-stretch shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-50 rounded-t-3xl pb-safe">
+          <button onClick={() => setActiveTab('home')} className={`relative flex flex-col items-center gap-0.5 p-1.5 flex-1 min-w-0 transition-colors ${activeTab === 'home' ? 'text-indigo-600' : 'text-gray-400'}`}>
             <div className={`relative p-1 rounded-xl ${activeTab === 'home' ? 'bg-indigo-50' : ''}`}>
-              <Home size={22} className={activeTab === 'home' ? 'fill-indigo-600' : ''} />
+              <Home size={20} className={activeTab === 'home' ? 'fill-indigo-600' : ''} />
               {guidanceRemainingToday > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white shadow-sm" aria-hidden />
               )}
             </div>
-            <span className="text-[10px] font-bold">首頁</span>
+            <span className="text-[9px] font-bold truncate w-full text-center">首頁</span>
           </button>
 
-          <button onClick={() => setActiveTab('failures')} className={`flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'failures' ? 'text-indigo-600' : 'text-gray-400'}`}>
-            <div className={`p-1 rounded-xl ${activeTab === 'failures' ? 'bg-indigo-50' : ''}`}><Sparkles size={22} /></div>
-            <span className="text-[10px] font-bold">學習紀錄</span>
+          <button onClick={() => setActiveTab('failures')} className={`flex flex-col items-center gap-0.5 p-1.5 flex-1 min-w-0 transition-colors ${activeTab === 'failures' ? 'text-indigo-600' : 'text-gray-400'}`}>
+            <div className={`p-1 rounded-xl ${activeTab === 'failures' ? 'bg-indigo-50' : ''}`}><Sparkles size={20} /></div>
+            <span className="text-[9px] font-bold truncate w-full text-center">學習紀錄</span>
           </button>
 
-          <button onClick={() => setActiveTab('stats')} className={`flex flex-col items-center gap-1 p-2 flex-1 transition-colors ${activeTab === 'stats' ? 'text-blue-600' : 'text-gray-400'}`}>
-            <div className={`p-1 rounded-xl ${activeTab === 'stats' ? 'bg-blue-50' : ''}`}><BarChart2 size={22} /></div>
-            <span className="text-[10px] font-bold">Stats</span>
+          <button onClick={() => setActiveTab('stats')} className={`flex flex-col items-center gap-0.5 p-1.5 flex-1 min-w-0 transition-colors ${activeTab === 'stats' ? 'text-blue-600' : 'text-gray-400'}`}>
+            <div className={`p-1 rounded-xl ${activeTab === 'stats' ? 'bg-blue-50' : ''}`}><BarChart2 size={20} /></div>
+            <span className="text-[9px] font-bold truncate w-full text-center">Stats</span>
+          </button>
+
+          <button onClick={() => setActiveTab('database')} className={`flex flex-col items-center gap-0.5 p-1.5 flex-1 min-w-0 transition-colors ${activeTab === 'database' ? 'text-violet-600' : 'text-gray-400'}`}>
+            <div className={`p-1 rounded-xl ${activeTab === 'database' ? 'bg-violet-50' : ''}`}><Database size={20} /></div>
+            <span className="text-[9px] font-bold truncate w-full text-center">資料庫</span>
           </button>
         </nav>
       </div>
