@@ -178,6 +178,83 @@ const getStyleByTitle = (title) => {
   const gemSheen =
     'bg-[radial-gradient(ellipse_at_30%_0%,rgba(255,255,255,0.35),transparent_55%),radial-gradient(ellipse_at_80%_100%,rgba(255,255,255,0.12),transparent_50%)]';
 
+  const exact = {
+    '0%': {
+      bg: 'from-slate-800 via-slate-900 to-black',
+      text: 'from-slate-100 to-slate-300',
+      icon: 'text-slate-200',
+      sheen: 'bg-gradient-to-b from-white/12 via-transparent to-black/40',
+      texture: `${dotNoise} opacity-20`,
+      ring: 'ring-1 ring-white/10',
+    },
+    '3%': {
+      bg: 'from-indigo-600 via-indigo-800 to-slate-950',
+      text: 'from-indigo-100 to-white',
+      icon: 'text-indigo-100',
+      sheen: 'bg-gradient-to-tr from-white/18 via-transparent to-black/40',
+      texture: `${lineNoise}`,
+      ring: 'ring-1 ring-indigo-200/25',
+    },
+    '6%': {
+      bg: 'from-blue-600 via-indigo-800 to-slate-950',
+      text: 'from-blue-100 to-white',
+      icon: 'text-blue-100',
+      sheen: 'bg-gradient-to-t from-black/35 via-transparent to-white/18',
+      texture: `${lineNoise}`,
+      ring: 'ring-1 ring-blue-200/25',
+    },
+    '9%': {
+      bg: 'from-sky-500 via-blue-700 to-indigo-950',
+      text: 'from-sky-50 to-white',
+      icon: 'text-sky-100',
+      sheen: 'bg-gradient-to-bl from-white/16 via-transparent to-indigo-950/45',
+      texture: `${dotNoise} opacity-25`,
+      ring: 'ring-1 ring-sky-200/25',
+    },
+    '12%': {
+      bg: 'from-teal-500 via-emerald-700 to-slate-950',
+      text: 'from-emerald-50 to-white',
+      icon: 'text-emerald-100',
+      sheen: 'bg-gradient-to-tr from-white/18 via-transparent to-emerald-950/45',
+      texture: `${dotNoise} opacity-24`,
+      ring: 'ring-1 ring-emerald-200/25',
+    },
+    '12%初階': {
+      bg: 'from-emerald-500 via-teal-700 to-indigo-950',
+      text: 'from-emerald-50 to-white',
+      icon: 'text-emerald-100',
+      sheen: 'bg-gradient-to-t from-black/35 via-transparent to-white/16',
+      texture: `${lineNoise} opacity-35`,
+      ring: 'ring-1 ring-emerald-200/25',
+    },
+    '15%初階': {
+      bg: 'from-amber-500 via-orange-700 to-slate-950',
+      text: 'from-amber-50 to-white',
+      icon: 'text-amber-100',
+      sheen: 'bg-gradient-to-tr from-white/20 via-transparent to-orange-950/45',
+      texture: `${dotNoise} opacity-22`,
+      ring: 'ring-1 ring-amber-100/35',
+    },
+    '15%銅章': {
+      bg: 'from-orange-500 via-amber-700 to-orange-950',
+      text: 'from-orange-50 to-amber-100',
+      icon: 'text-orange-100',
+      sheen: 'bg-gradient-to-b from-white/18 via-transparent to-black/40',
+      texture: `${lineNoise} opacity-35`,
+      ring: 'ring-1 ring-orange-200/25',
+    },
+    '18%銅章': {
+      bg: 'from-amber-500 via-orange-800 to-slate-950',
+      text: 'from-amber-50 to-orange-100',
+      icon: 'text-amber-100',
+      sheen: 'bg-gradient-to-tr from-white/18 via-transparent to-black/45',
+      texture: `${dotNoise} opacity-22`,
+      ring: 'ring-1 ring-amber-200/30',
+    },
+  };
+
+  if (exact[title]) return exact[title];
+
   if (title.includes("三鑽石") || title.includes("雙鑽石"))
     return {
       bg: 'from-fuchsia-600 via-purple-700 to-indigo-900',
@@ -2302,8 +2379,26 @@ function AppInner() {
                     </div>
                   )}
 
-                  <button onClick={() => setShowLevelUpAnim(false)} className="mt-4 w-full bg-indigo-600 md:hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md active:scale-95">
-                      繼續努力！
+                  {levelUpData.isNewTitle && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowLevelUpAnim(false);
+                        setActiveTab('home');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="mt-4 w-full bg-amber-500 md:hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors shadow-md active:scale-95"
+                    >
+                      快來查看
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowLevelUpAnim(false)}
+                    className={`w-full ${levelUpData.isNewTitle ? 'mt-2' : 'mt-4'} bg-indigo-600 md:hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md active:scale-95`}
+                  >
+                    繼續努力！
                   </button>
               </div>
           </div>
