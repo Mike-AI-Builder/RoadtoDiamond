@@ -2413,17 +2413,17 @@ function AppInner() {
                   <div className="w-[100vw] h-[100vw] border-[4vw] border-dashed border-white/10 rounded-full anim-spin-slow absolute opacity-50"></div>
               </div>
               <div
-                className="relative z-10 anim-bounce-pop flex flex-col items-center bg-white p-8 rounded-3xl shadow-[0_0_50px_rgba(251,191,36,0.3)] border-4 border-amber-300 w-10/12 max-w-sm"
+                className="relative z-10 anim-bounce-pop flex flex-col items-center bg-white px-7 pt-7 pb-6 rounded-3xl shadow-[0_0_50px_rgba(251,191,36,0.3)] border-4 border-amber-300 w-10/12 max-w-sm"
                 onClick={(e) => e.stopPropagation()}
               >
                   <div className="absolute -top-12 bg-gradient-to-br from-yellow-300 to-amber-500 w-24 h-24 rounded-full flex items-center justify-center shadow-lg border-4 border-white">
                       <Trophy size={48} className="text-indigo-900" />
                   </div>
-                  <h2 className="text-3xl font-black text-indigo-900 mt-10 mb-1">等級提升！</h2>
-                  <p className={`text-lg text-gray-500 font-bold ${levelUpData.isNewTitle ? 'mb-4' : 'mb-8'}`}>到達 LV.{levelUpData.lv}</p>
+                  <h2 className="text-3xl font-black text-indigo-900 mt-9 mb-1">等級提升！</h2>
+                  <p className={`text-2xl text-gray-700 font-black tracking-wide ${levelUpData.isNewTitle ? 'mb-3' : 'mb-5'}`}>到達 LV.{levelUpData.lv}</p>
                   
                   {levelUpData.isNewTitle && (
-                    <div className="bg-indigo-50 w-full py-4 rounded-xl text-center border border-indigo-100 mb-2">
+                    <div className="bg-indigo-50 w-full py-3 rounded-xl text-center border border-indigo-100 mb-2">
                         <p className="text-xs text-indigo-600 font-bold mb-1">恭喜上聘！解鎖新獎銜</p>
                         <p className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-amber-500 to-orange-500">{levelUpData.title}</p>
                     </div>
