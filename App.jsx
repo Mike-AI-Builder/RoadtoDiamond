@@ -2187,7 +2187,7 @@ function AppInner() {
                           next[i] = e.target.value;
                           setDraftGuidanceQuotes(next);
                         }}
-                        className="flex-1 text-sm rounded-lg border border-slate-200 p-2 min-h-[52px] text-slate-800"
+                        className="flex-1 text-[16px] rounded-lg border border-slate-200 p-2 min-h-[52px] text-slate-800"
                         rows={2}
                       />
                       <button
@@ -2269,7 +2269,7 @@ function AppInner() {
                             next[i] = { ...ft, label: e.target.value };
                             setDraftFailureTypes(next);
                           }}
-                          className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800"
+                          className="w-full text-[16px] border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800"
                           placeholder="名稱"
                         />
                         <div className="flex items-center gap-2">
@@ -2284,7 +2284,7 @@ function AppInner() {
                               next[i] = { ...ft, exp: Math.max(0, Number(e.target.value) || 0) };
                               setDraftFailureTypes(next);
                             }}
-                            className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1 text-center"
+                            className="w-20 text-[16px] border border-slate-200 rounded-lg px-2 py-1 text-center"
                           />
                           <button
                             type="button"
@@ -2336,7 +2336,7 @@ function AppInner() {
                       setTempHabits(next);
                     }}
                     rows={2}
-                    className="rounded-xl border border-slate-200 p-2 text-xs text-slate-800 resize-none min-h-[56px]"
+                    className="rounded-xl border border-slate-200 p-2 text-[16px] text-slate-800 resize-none min-h-[56px]"
                     placeholder=""
                   />
                 ))}
@@ -2360,7 +2360,7 @@ function AppInner() {
                     <input
                       value={draftStatTargets[key].label}
                       onChange={(e) => updateDraftStatTarget(key, 'label', e.target.value)}
-                      className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+                      className="flex-1 text-[16px] border border-slate-200 rounded-lg px-2 py-1.5"
                       placeholder=""
                     />
                     <input
@@ -2369,7 +2369,7 @@ function AppInner() {
                       max={99999}
                       value={draftStatTargets[key].target}
                       onChange={(e) => updateDraftStatTarget(key, 'target', e.target.value)}
-                      className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-center"
+                      className="w-20 text-[16px] border border-slate-200 rounded-lg px-2 py-1.5 text-center"
                     />
                   </div>
                 ))}
@@ -2396,7 +2396,7 @@ function AppInner() {
                     const [hh, mm] = v.split(':').map(Number);
                     setDraftSettlementTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
                   }}
-                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
+                  className="text-[16px] border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
                 />
               </div>
               {editActions(saveSettlementSection)}
