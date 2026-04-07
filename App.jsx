@@ -412,6 +412,28 @@ function updateIsoDateKeepTime(iso, ymd) {
   }
 }
 
+function isoToLocalMinuteInputValue(iso) {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return '';
+  }
+}
+
+function localMinuteInputValueToIso(v) {
+  try {
+    if (!v) return '';
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toISOString();
+  } catch {
+    return '';
+  }
+}
+
 function initialCompletedLineCount(grid) {
   let completedLines = 0;
   WIN_LINES.forEach((line) => {
@@ -543,7 +565,6 @@ export default function App() {
   // --- Bingo State ---
   const [habits, setHabits] = useState(INITIAL_GAME.habits);
   const [gridState, setGridState] = useState(INITIAL_GAME.gridState);
-  const [isEditingHabits, setIsEditingHabits] = useState(false);
   const [tempHabits, setTempHabits] = useState([...INITIAL_GAME.habits]);
   const [streak, setStreak] = useState(INITIAL_GAME.streak);
   const [hasWonToday, setHasWonToday] = useState(INITIAL_GAME.hasWonToday);
@@ -555,7 +576,7 @@ export default function App() {
   const [recentExpGain, setRecentExpGain] = useState(0);
   const [failureQuote, setFailureQuote] = useState("");
   const [editingFailureId, setEditingFailureId] = useState(null);
-  const [draftFailureDate, setDraftFailureDate] = useState('');
+  const [draftFailureDateTime, setDraftFailureDateTime] = useState('');
 
   // --- Stats State ---
   const [businessRecords, setBusinessRecords] = useState(INITIAL_GAME.businessRecords);
@@ -982,7 +1003,6 @@ export default function App() {
   };
 
   const toggleGrid = (index, e) => {
-    if (isEditingHabits) return;
     const newGrid = [...gridState];
     const isChecking = !newGrid[index];
     newGrid[index] = isChecking;
@@ -998,7 +1018,6 @@ export default function App() {
 
   const saveHabits = () => {
     setHabits(tempHabits);
-    setIsEditingHabits(false);
   };
 
   const recordFailure = (typeObj, customText = "") => {
@@ -1103,21 +1122,16 @@ export default function App() {
         {/* Player Profile / Level Card */}
         <div className={`bg-gradient-to-br ${cardStyle.bg} rounded-2xl p-4 shadow-lg text-white relative overflow-hidden transition-all duration-500`}>
           
-          <div className="flex justify-between items-center mb-4 relative z-10">
-             <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold tracking-wider border border-white/10">
+          <div className="flex justify-between items-center mb-2 relative z-10">
+             <span className="bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-black tracking-wider border border-white/10">
                LV.{level}
              </span>
           </div>
 
-          <div className="flex flex-col items-center justify-center mb-5 relative z-10">
-             <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center shadow-inner border border-white/20 mb-3 px-2">
-                <span className="text-center text-[11px] font-black leading-tight tracking-wide text-white/95 drop-shadow-sm line-clamp-2">
-                  {currentTitle}
-                </span>
-             </div>
-             <h2 className={`text-2xl font-black bg-clip-text text-transparent bg-gradient-to-b ${cardStyle.text} leading-tight text-center tracking-wider drop-shadow-sm`}>
-               鑽石之路
-             </h2>
+          <div className="relative z-10 mb-2">
+            <h2 className={`text-3xl font-black bg-clip-text text-transparent bg-gradient-to-b ${cardStyle.text} leading-tight text-center tracking-wider drop-shadow-sm`}>
+              {currentTitle}
+            </h2>
           </div>
 
           <div className="w-full relative z-10">
@@ -1131,7 +1145,7 @@ export default function App() {
                   style={{ width: `${expProgress}%` }}
                 />
               </div>
-              <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
+              <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
                 <span className="bg-black/20 px-2.5 py-1 rounded-md text-[10px] text-white/90 border border-white/10">
                    本季戰績：{seasonRecord.wins}勝 {seasonRecord.losses}負
                 </span>
@@ -1140,66 +1154,61 @@ export default function App() {
                 </span>
               </div>
           </div>
+        </div>
 
-          {/* 今日指引：與等級卡同匡 */}
-          <div className="mt-5 pt-5 border-t border-white/20 relative z-10">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 border border-white/20">
-                  <BookOpen size={16} className="text-white/90" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-bold tracking-wide text-white/90">今日指引</p>
-                  <p className="text-[9px] text-white/55 truncate">每天一次 · 為今天抽一句話</p>
-                </div>
+        {/* 今日指引（獨立匡格） */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 border border-indigo-100">
+                <BookOpen size={18} className="text-indigo-600" />
               </div>
-              {guidanceRemainingToday > 0 && !guidanceDrawsToday.length && !guidanceDrawing && (
-                <span className="shrink-0 text-[9px] font-bold bg-amber-400/25 text-amber-100 px-2 py-1 rounded-full border border-amber-300/35">
-                  可抽
-                </span>
-              )}
+              <p className="text-sm font-black tracking-wide text-gray-800">今日指引</p>
             </div>
-
-            {guidanceDrawing ? (
-              <div className="anim-guidance-draw-panel relative overflow-hidden rounded-2xl border border-white/25 bg-black/20 px-4 py-8 backdrop-blur-md">
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-40">
-                  <div className="h-36 w-36 shrink-0 rounded-full bg-[conic-gradient(from_0deg,transparent,rgba(255,255,255,0.4),transparent)] anim-guidance-orbit" />
-                </div>
-                <div className="relative flex flex-col items-center gap-3">
-                  <div className="relative flex h-14 w-14 items-center justify-center">
-                    <Sparkles size={36} className="relative z-10 text-amber-200 drop-shadow-[0_0_12px_rgba(253,230,138,0.8)] anim-guidance-sparkle" />
-                    <Sparkles size={18} className="absolute -right-1 top-0 text-white/80 anim-guidance-sparkle-delay" />
-                    <Sparkles size={14} className="absolute -left-0.5 bottom-0 text-amber-100/90 anim-guidance-sparkle-delay2" />
-                  </div>
-                  <p className="text-center text-xs font-semibold text-white/90 anim-guidance-shimmer">
-                    正在為你抽選今日指引…
-                  </p>
-                </div>
-              </div>
-            ) : guidanceDrawsToday.length > 0 ? (
-              <div
-                key={guidanceRevealNonce}
-                className={`rounded-2xl border border-white/25 bg-white/10 p-4 shadow-inner backdrop-blur-sm ${guidanceRevealNonce > 0 ? 'anim-guidance-reveal' : ''}`}
-              >
-                <p className="text-center text-sm font-semibold leading-relaxed text-white drop-shadow-sm">
-                  「{guidanceDrawsToday[0]}」
-                </p>
-                <p className="mt-3 text-center text-[10px] text-white/50">明天可再抽一次新的指引</p>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleDrawTodayGuidance}
-                className="group relative w-full overflow-hidden rounded-2xl border border-white/30 bg-white/15 py-3.5 pl-4 pr-4 text-left font-bold text-white shadow-md transition-all active:scale-[0.99] hover:border-white/45 hover:bg-white/22"
-              >
-                <span className="pointer-events-none absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-[100%]" />
-                <span className="relative flex items-center justify-center gap-2">
-                  <Sparkles size={18} className="text-amber-200" />
-                  抽取今日指引
-                </span>
-              </button>
+            {guidanceRemainingToday > 0 && !guidanceDrawsToday.length && !guidanceDrawing && (
+              <span className="shrink-0 text-[10px] font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-100">
+                可抽
+              </span>
             )}
           </div>
+
+          {guidanceDrawing ? (
+            <div className="anim-guidance-draw-panel relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-30">
+                <div className="h-36 w-36 shrink-0 rounded-full bg-[conic-gradient(from_0deg,transparent,rgba(99,102,241,0.35),transparent)] anim-guidance-orbit" />
+              </div>
+              <div className="relative flex flex-col items-center gap-3">
+                <div className="relative flex h-14 w-14 items-center justify-center">
+                  <Sparkles size={36} className="relative z-10 text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)] anim-guidance-sparkle" />
+                  <Sparkles size={18} className="absolute -right-1 top-0 text-indigo-400/70 anim-guidance-sparkle-delay" />
+                  <Sparkles size={14} className="absolute -left-0.5 bottom-0 text-amber-300/80 anim-guidance-sparkle-delay2" />
+                </div>
+                <p className="text-center text-xs font-semibold text-slate-700 anim-guidance-shimmer">
+                  正在抽選…
+                </p>
+              </div>
+            </div>
+          ) : guidanceDrawsToday.length > 0 ? (
+            <div
+              key={guidanceRevealNonce}
+              className={`rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ${guidanceRevealNonce > 0 ? 'anim-guidance-reveal' : ''}`}
+            >
+              <p className="text-center text-sm font-bold leading-relaxed text-slate-800">
+                「{guidanceDrawsToday[0]}」
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleDrawTodayGuidance}
+              className="group relative w-full overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50 py-3.5 text-center font-black text-indigo-700 shadow-sm transition-all active:scale-[0.99] hover:bg-indigo-100/70"
+            >
+              <span className="relative flex items-center justify-center gap-2">
+                <Sparkles size={18} className="text-amber-500" />
+                抽取今日指引
+              </span>
+            </button>
+          )}
         </div>
 
         {/* --- 今日比賽數據區塊 --- */}
@@ -1264,15 +1273,7 @@ export default function App() {
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
           <div className="flex justify-between items-start">
             <div>
-              <div className="flex items-center gap-2">
-                 <h2 className="text-xl font-bold text-gray-800">今日比賽</h2>
-                 <button 
-                   onClick={() => isEditingHabits ? saveHabits() : setIsEditingHabits(true)}
-                   className="text-indigo-500 hover:bg-indigo-50 p-1 rounded-full transition-colors"
-                 >
-                   {isEditingHabits ? <Check size={16} /> : <Edit3 size={16} />}
-                 </button>
-              </div>
+              <h2 className="text-xl font-bold text-gray-800">今日比賽</h2>
               <p className="text-gray-500 text-xs mt-0.5">達成全部目標即獲勝</p>
             </div>
             <div className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-xl font-bold flex flex-col items-end">
@@ -1294,33 +1295,19 @@ export default function App() {
                 onClick={(e) => toggleGrid(index, e)}
                 className={`
                   relative aspect-square rounded-2xl flex items-center justify-center p-2 text-center transition-all duration-300 cursor-pointer select-none
-                  ${isEditingHabits ? 'bg-gray-50 border-2 border-dashed border-gray-300' : 
-                    gridState[index] 
-                      ? 'bg-indigo-50 text-indigo-700 border-2 border-indigo-300 shadow-sm scale-95' 
-                      : 'bg-gray-50 hover:bg-indigo-50 text-gray-700 border border-gray-100'}
+                  ${gridState[index] 
+                    ? 'bg-indigo-50 text-indigo-700 border-2 border-indigo-300 shadow-sm scale-95' 
+                    : 'bg-gray-50 hover:bg-indigo-50 text-gray-700 border border-gray-100'}
                 `}
               >
-                {isEditingHabits ? (
-                  <textarea 
-                    className="w-full h-full bg-transparent resize-none text-center text-xs md:text-sm outline-none"
-                    value={tempHabits[index]}
-                    onChange={(e) => {
-                      const newTemp = [...tempHabits];
-                      newTemp[index] = e.target.value;
-                      setTempHabits(newTemp);
-                    }}
-                    placeholder="輸入習慣..."
-                  />
-                ) : (
-                  <>
-                    <span className="text-xs md:text-sm font-medium z-10 break-words w-full line-clamp-3 leading-tight">{habit}</span>
-                    {gridState[index] && (
-                      <div className="absolute top-2 right-2 text-indigo-400">
-                        <Check size={16} />
-                      </div>
-                    )}
-                  </>
-                )}
+                <>
+                  <span className="text-xs md:text-sm font-medium z-10 break-words w-full line-clamp-3 leading-tight">{habit}</span>
+                  {gridState[index] && (
+                    <div className="absolute top-2 right-2 text-indigo-400">
+                      <Check size={16} />
+                    </div>
+                  )}
+                </>
               </div>
             ))}
           </div>
@@ -1399,28 +1386,31 @@ export default function App() {
                     {editingFailureId === f.id && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <input
-                          type="date"
-                          value={draftFailureDate}
-                          onChange={(e) => setDraftFailureDate(e.target.value)}
+                          type="datetime-local"
+                          step={60}
+                          value={draftFailureDateTime}
+                          onChange={(e) => setDraftFailureDateTime(e.target.value)}
                           className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-700"
                         />
                         <button
                           type="button"
                           onClick={() => {
-                            const nextDate = draftFailureDate || f.date;
+                            const nextIso = localMinuteInputValueToIso(draftFailureDateTime);
+                            if (!nextIso) return;
+                            const nextDate = nextIso.split('T')[0];
                             setFailures((prev) =>
                               prev.map((x) =>
                                 x.id === f.id
                                   ? {
                                       ...x,
                                       date: nextDate,
-                                      recordedAt: updateIsoDateKeepTime(x.recordedAt, nextDate),
+                                      recordedAt: nextIso,
                                     }
                                   : x
                               )
                             );
                             setEditingFailureId(null);
-                            setDraftFailureDate('');
+                            setDraftFailureDateTime('');
                           }}
                           className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-white hover:bg-slate-700"
                         >
@@ -1430,7 +1420,7 @@ export default function App() {
                           type="button"
                           onClick={() => {
                             setEditingFailureId(null);
-                            setDraftFailureDate('');
+                            setDraftFailureDateTime('');
                           }}
                           className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
                         >
@@ -1444,11 +1434,11 @@ export default function App() {
                     onClick={() => {
                       if (editingFailureId === f.id) {
                         setEditingFailureId(null);
-                        setDraftFailureDate('');
+                        setDraftFailureDateTime('');
                         return;
                       }
                       setEditingFailureId(f.id);
-                      setDraftFailureDate(f.date || f.recordedAt.split('T')[0]);
+                      setDraftFailureDateTime(isoToLocalMinuteInputValue(f.recordedAt));
                     }}
                     className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                     aria-label="修正日期"
@@ -1602,6 +1592,9 @@ export default function App() {
     if (section === 'settlement') {
       setDraftSettlementTime({ ...settlementTime });
     }
+    if (section === 'habits') {
+      setTempHabits([...habits]);
+    }
     setSettingsEditingSection(section);
   };
 
@@ -1628,6 +1621,15 @@ export default function App() {
 
   const saveSettlementSection = () => {
     setSettlementTime(normalizeSettlementTime(draftSettlementTime));
+    cancelSettingsEdit();
+  };
+
+  const saveHabitsSection = () => {
+    const next = tempHabits.map((h) => String(h ?? '').trim()).slice(0, 9);
+    const filled = [...next];
+    while (filled.length < 9) filled.push('');
+    setHabits(filled);
+    setTempHabits(filled);
     cancelSettingsEdit();
   };
 
@@ -1680,10 +1682,6 @@ export default function App() {
       </div>
     );
 
-    const collapsedHint = (
-      <p className="text-sm text-slate-400">已收合，按右上角鉛筆開始修正。</p>
-    );
-
     return (
       <div className="space-y-5 animate-fadeIn pb-8">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1725,7 +1723,7 @@ export default function App() {
               {editActions(saveGuidanceSection)}
             </>
           ) : (
-            collapsedHint
+            <div />
           )}
         </div>
 
@@ -1828,7 +1826,34 @@ export default function App() {
               {editActions(saveFailuresSection)}
             </>
           ) : (
-            collapsedHint
+            <div />
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          {sectionHeader('今日比賽', 'habits')}
+          {settingsEditingSection === 'habits' ? (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                {tempHabits.map((h, i) => (
+                  <textarea
+                    key={`hb-${i}`}
+                    value={h}
+                    onChange={(e) => {
+                      const next = [...tempHabits];
+                      next[i] = e.target.value;
+                      setTempHabits(next);
+                    }}
+                    rows={2}
+                    className="rounded-xl border border-slate-200 p-2 text-xs text-slate-800 resize-none min-h-[56px]"
+                    placeholder=""
+                  />
+                ))}
+              </div>
+              {editActions(saveHabitsSection)}
+            </>
+          ) : (
+            <div />
           )}
         </div>
 
@@ -1858,7 +1883,7 @@ export default function App() {
               {editActions(saveStatsSection)}
             </>
           ) : (
-            collapsedHint
+            <div />
           )}
         </div>
 
@@ -1881,7 +1906,7 @@ export default function App() {
               {editActions(saveSettlementSection)}
             </>
           ) : (
-            collapsedHint
+            <div />
           )}
         </div>
       </div>
