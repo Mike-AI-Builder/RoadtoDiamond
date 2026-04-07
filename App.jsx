@@ -1379,7 +1379,7 @@ function AppInner() {
 
   const renderFailures = () => (
     <div className="space-y-4 animate-fadeIn">
-      <div className="bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 rounded-3xl p-6 text-center border border-indigo-100 relative overflow-hidden">
+      <div className="bg-white rounded-3xl p-6 text-center border border-indigo-50 shadow-sm relative overflow-hidden">
         <h2 className="text-2xl font-bold text-gray-800 mb-1">學習紀錄</h2>
         <p className="text-gray-600 text-sm mb-3 leading-relaxed px-1">
           失敗為成功之母，每次失敗都是一次學習，把它們記錄下來，賺取經驗值！
@@ -1424,7 +1424,7 @@ function AppInner() {
 
       <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-black text-gray-800">記錄列表</p>
+          <p className="text-sm font-black text-gray-800">學習歷史紀錄</p>
         </div>
         {failures.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
@@ -1544,25 +1544,25 @@ function AppInner() {
         </div>
 
         {/* 本季平均數據 (移至上方, 最醒目) */}
-        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 shadow-lg text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-3 opacity-10">
-            <Crosshair size={80} />
+        <div className="bg-indigo-50/70 rounded-3xl p-5 shadow-sm border border-indigo-100 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 opacity-[0.06] text-indigo-900">
+            <Crosshair size={90} />
           </div>
-          <h3 className="font-bold text-lg mb-4 flex items-center gap-2 relative z-10">
-            <Crosshair size={20} className="text-indigo-300"/> 本季平均數據
+          <h3 className="font-black text-indigo-900 mb-4 flex items-center gap-2 relative z-10">
+            <Crosshair size={18} className="text-indigo-600"/> 本季平均數據
           </h3>
-          <div className="grid grid-cols-3 gap-2 text-center divide-x divide-white/20 relative z-10">
+          <div className="grid grid-cols-3 gap-2 text-center divide-x divide-indigo-200/60 relative z-10">
             <div>
-              <p className="text-xs text-indigo-200 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.contacts.label}</p>
-              <p className="text-3xl font-black">{businessStats.avgs.contacts}</p>
+              <p className="text-xs text-indigo-700/70 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.contacts.label}</p>
+              <p className="text-3xl font-black text-indigo-900">{businessStats.avgs.contacts}</p>
             </div>
             <div>
-              <p className="text-xs text-indigo-200 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.gatherings.label}</p>
-              <p className="text-3xl font-black">{businessStats.avgs.gatherings}</p>
+              <p className="text-xs text-indigo-700/70 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.gatherings.label}</p>
+              <p className="text-3xl font-black text-indigo-900">{businessStats.avgs.gatherings}</p>
             </div>
             <div>
-              <p className="text-xs text-indigo-200 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.strangers.label}</p>
-              <p className="text-3xl font-black">{businessStats.avgs.strangers}</p>
+              <p className="text-xs text-indigo-700/70 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.strangers.label}</p>
+              <p className="text-3xl font-black text-indigo-900">{businessStats.avgs.strangers}</p>
             </div>
           </div>
         </div>
@@ -1594,9 +1594,9 @@ function AppInner() {
           </div>
         </div>
 
-        <div>
-          <h3 className="font-bold text-gray-700 mb-3 ml-2 flex items-center gap-2">
-            <BarChart2 size={18} className="text-blue-500" /> 歷史紀錄
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
+          <h3 className="font-black text-gray-800 mb-3 flex items-center gap-2">
+            <BarChart2 size={18} className="text-blue-600" /> 數據歷史紀錄
           </h3>
           <div className="space-y-2">
             {[...businessRecords].reverse().map((record, index) => {
