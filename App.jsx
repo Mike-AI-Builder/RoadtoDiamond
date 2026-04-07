@@ -345,7 +345,7 @@ const getStyleByTitle = (title) => {
 
 // --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
 const STORAGE_KEY = 'road-to-diamond-game-v1';
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 const DEFAULT_SETTLEMENT_TIME = { hour: 4, minute: 0 };
 
@@ -413,6 +413,13 @@ function getNextGameDayKey(dayStr) {
   const [y, m, d] = dayStr.split('-').map(Number);
   const dt = new Date(y, m - 1, d);
   dt.setDate(dt.getDate() + 1);
+  return formatLocalYMD(dt);
+}
+
+function getPrevGameDayKey(dayStr) {
+  const [y, m, d] = dayStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - 1);
   return formatLocalYMD(dt);
 }
 
@@ -663,6 +670,25 @@ function loadPersistedGameState() {
     const lastPlayDateLegacy =
       typeof d.lastPlayDate === 'string' && d.lastPlayDate ? d.lastPlayDate : targetGameDay;
 
+    let businessRecords = Array.isArray(d.businessRecords) ? d.businessRecords : [];
+
+    // v3 以前曾把 lastPlayDate 每次存檔都寫成「當下遊戲日」，
+    // 導致跨日後無法在下次開啟時把前一天的 todayStats 結算進歷史。
+    // 若偵測到「昨天缺一筆」但 todayStats 有數據，先補進昨天，避免使用者看不到昨天成績。
+    if (fileVersion <= 3) {
+      const prevKey = getPrevGameDayKey(targetGameDay);
+      const ts = {
+        contacts: Number(d.todayStats?.contacts) || 0,
+        gatherings: Number(d.todayStats?.gatherings) || 0,
+        strangers: Number(d.todayStats?.strangers) || 0,
+      };
+      const hasAny = ts.contacts || ts.gatherings || ts.strangers;
+      const hasPrev = businessRecords.some((r) => r?.date === prevKey);
+      if (hasAny && !hasPrev) {
+        businessRecords = upsertBusinessRecord(businessRecords, prevKey, ts);
+      }
+    }
+
     const rawSaved = {
       lastPlayDate: lastPlayDateLegacy,
       gridState:
@@ -674,7 +700,7 @@ function loadPersistedGameState() {
         gatherings: Number(d.todayStats?.gatherings) || 0,
         strangers: Number(d.todayStats?.strangers) || 0,
       },
-      businessRecords: Array.isArray(d.businessRecords) ? d.businessRecords : [],
+      businessRecords,
       seasonRecord:
         d.seasonRecord && typeof d.seasonRecord === 'object'
           ? { wins: Number(d.seasonRecord.wins) || 0, losses: Number(d.seasonRecord.losses) || 0 }
@@ -896,7 +922,7 @@ function AppInner() {
   useEffect(() => {
     const payload = {
       v: SAVE_VERSION,
-      lastPlayDate: getGameDayKey(new Date(), settlementTime),
+      lastPlayDate: lastPlayDateRef.current,
       baseExp,
       seasonRecord,
       habits,
