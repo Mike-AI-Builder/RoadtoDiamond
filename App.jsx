@@ -1038,7 +1038,7 @@ function AppInner() {
       setLevelUpData({ lv: level, title: currentTitle, isNewTitle });
       setShowLevelUpAnim(true);
       setPrevLevel(level);
-      const timer = setTimeout(() => setShowLevelUpAnim(false), 5000);
+      const timer = setTimeout(() => setShowLevelUpAnim(false), 2200);
       return () => clearTimeout(timer);
     }
   }, [level, currentTitle, prevLevel]);
@@ -1272,6 +1272,7 @@ function AppInner() {
   const removeFailure = (id) => {
     const item = failures.find((f) => f.id === id);
     if (!item) return;
+    if (!window.confirm('確定要刪除這筆學習紀錄嗎？')) return;
     setFailures((prev) => prev.filter((f) => f.id !== id));
     setBaseExp((prev) => Math.max(0, prev - item.exp));
   };
@@ -1574,13 +1575,17 @@ function AppInner() {
         className="pointer-events-none absolute inset-0 -z-10 rounded-[2rem] bg-[radial-gradient(ellipse_at_40%_0%,rgba(251,191,36,0.14),transparent_55%)]"
         aria-hidden
       />
-      <div className="relative overflow-hidden bg-white rounded-3xl p-6 text-center border border-indigo-50 shadow-sm">
+      <div className="relative overflow-hidden bg-white rounded-3xl p-6 text-center border border-slate-200 shadow-sm">
         <div
-          className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-amber-100/70 blur-3xl"
+          className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-indigo-100/80 blur-3xl"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-indigo-100/50 blur-2xl"
+          className="pointer-events-none absolute -left-10 bottom-0 h-36 w-36 rounded-full bg-sky-100/70 blur-2xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(148,163,184,0.18)_1px,transparent_1px)] bg-[length:100%_10px]"
           aria-hidden
         />
         <h2 className="relative z-10 text-2xl font-bold text-gray-800 mb-1">學習紀錄</h2>
@@ -2360,12 +2365,23 @@ function AppInner() {
 
         {/* --- 4. 升級解鎖動畫 --- */}
         {showLevelUpAnim && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-indigo-900/85 backdrop-blur-md">
+          <div
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-indigo-900/85 backdrop-blur-md"
+            onClick={() => setShowLevelUpAnim(false)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setShowLevelUpAnim(false);
+            }}
+          >
               <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
                   <div className="w-[150vw] h-[150vw] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.1)_350deg,transparent_360deg)] anim-spin-slow opacity-50 rounded-full"></div>
                   <div className="w-[100vw] h-[100vw] border-[4vw] border-dashed border-white/10 rounded-full anim-spin-slow absolute opacity-50"></div>
               </div>
-              <div className="relative z-10 anim-bounce-pop flex flex-col items-center bg-white p-8 rounded-3xl shadow-[0_0_50px_rgba(251,191,36,0.3)] border-4 border-amber-300 w-10/12 max-w-sm">
+              <div
+                className="relative z-10 anim-bounce-pop flex flex-col items-center bg-white p-8 rounded-3xl shadow-[0_0_50px_rgba(251,191,36,0.3)] border-4 border-amber-300 w-10/12 max-w-sm"
+                onClick={(e) => e.stopPropagation()}
+              >
                   <div className="absolute -top-12 bg-gradient-to-br from-yellow-300 to-amber-500 w-24 h-24 rounded-full flex items-center justify-center shadow-lg border-4 border-white">
                       <Trophy size={48} className="text-indigo-900" />
                   </div>
@@ -2392,14 +2408,6 @@ function AppInner() {
                       快來查看
                     </button>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => setShowLevelUpAnim(false)}
-                    className={`w-full ${levelUpData.isNewTitle ? 'mt-2' : 'mt-4'} bg-indigo-600 md:hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md active:scale-95`}
-                  >
-                    繼續努力！
-                  </button>
               </div>
           </div>
         )}
