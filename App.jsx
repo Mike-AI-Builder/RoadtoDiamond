@@ -1833,6 +1833,8 @@ function AppInner() {
   );
 
   const renderStats = () => {
+    const currentGameDayKey = getGameDayKey(new Date(), settlementTime);
+    const showCurrentGameDayRow = !businessRecords.some((r) => r.date === currentGameDayKey);
     return (
       <div className="relative space-y-6 animate-fadeIn pb-8">
         <div
@@ -1931,9 +1933,35 @@ function AppInner() {
             aria-hidden
           />
           <h3 className="relative z-10 font-black text-gray-800 mb-3 flex items-center gap-2">
-            <BarChart2 size={18} className="text-blue-600" /> 數據歷史紀錄
+            <BarChart2 size={18} className="text-blue-600" /> 歷史比賽數據
           </h3>
           <div className="relative z-10 space-y-2">
+            {showCurrentGameDayRow && (
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex justify-between items-center md:hover:bg-blue-50/50 transition-colors">
+                <span className="text-sm font-bold text-gray-500 w-24">{currentGameDayKey}</span>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="flex items-center gap-1 text-emerald-600">
+                    <MessageCircle size={14} />
+                    <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
+                      {Number(todayStats.contacts) || 0}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1 text-blue-600">
+                    <Users size={14} />
+                    <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
+                      {Number(todayStats.gatherings) || 0}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1 text-purple-600">
+                    <TrendingUp size={14} />
+                    <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
+                      {Number(todayStats.strangers) || 0}
+                    </span>
+                  </span>
+                </div>
+                <div className="ml-2 w-[44px]" aria-hidden />
+              </div>
+            )}
             {[...businessRecords].reverse().map((record, index) => {
               const realIndex = businessRecords.length - 1 - index;
               const isEditing = editingBusinessRecordIndex === realIndex;
