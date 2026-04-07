@@ -169,18 +169,104 @@ const getTitleByLevel = (lv) => {
   return "三鑽石";
 };
 
-// 根據獎銜動態取得卡片漸層與文字色彩
+// 根據獎銜動態取得卡片漸層、文字色彩與材質層（光澤／細紋）
 const getStyleByTitle = (title) => {
-  if (title.includes("三鑽石") || title.includes("雙鑽石")) return { bg: "from-fuchsia-600 via-purple-700 to-indigo-800", text: "from-pink-200 to-fuchsia-100", icon: "text-fuchsia-200" };
-  if (title.includes("鑽石")) return { bg: "from-cyan-500 via-blue-600 to-indigo-700", text: "from-cyan-100 to-white", icon: "text-cyan-200" };
-  if (title.includes("翡翠")) return { bg: "from-emerald-500 via-teal-600 to-green-800", text: "from-emerald-100 to-green-50", icon: "text-emerald-200" };
-  if (title.includes("藍寶石")) return { bg: "from-blue-500 via-indigo-600 to-blue-900", text: "from-blue-100 to-indigo-50", icon: "text-blue-200" };
-  if (title.includes("紅寶石")) return { bg: "from-rose-500 via-red-600 to-rose-900", text: "from-rose-100 to-red-50", icon: "text-rose-200" };
-  if (title.includes("白金")) return { bg: "from-slate-400 via-slate-500 to-slate-700", text: "from-slate-100 to-white", icon: "text-slate-200" };
-  if (title.includes("金章")) return { bg: "from-yellow-400 via-amber-500 to-yellow-700", text: "from-yellow-100 to-amber-50", icon: "text-yellow-200" };
-  if (title.includes("銀章")) return { bg: "from-gray-400 via-zinc-400 to-zinc-600", text: "from-gray-100 to-white", icon: "text-gray-100" };
-  if (title.includes("銅章") || title.includes("初階")) return { bg: "from-orange-400 via-amber-600 to-orange-800", text: "from-orange-100 to-yellow-50", icon: "text-orange-200" };
-  return { bg: "from-slate-700 via-slate-800 to-slate-900", text: "from-slate-200 to-slate-400", icon: "text-slate-400" };
+  const dotNoise =
+    'bg-[radial-gradient(rgba(255,255,255,0.22)_1px,transparent_1px)] bg-[length:7px_7px] opacity-[0.35]';
+  const lineNoise =
+    'bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.06)_0,rgba(255,255,255,0.06)_1px,transparent_1px,transparent_6px)] opacity-40';
+  const gemSheen =
+    'bg-[radial-gradient(ellipse_at_30%_0%,rgba(255,255,255,0.35),transparent_55%),radial-gradient(ellipse_at_80%_100%,rgba(255,255,255,0.12),transparent_50%)]';
+
+  if (title.includes("三鑽石") || title.includes("雙鑽石"))
+    return {
+      bg: 'from-fuchsia-600 via-purple-700 to-indigo-900',
+      text: 'from-pink-100 to-fuchsia-100',
+      icon: 'text-fuchsia-200',
+      sheen: 'bg-gradient-to-br from-white/25 via-transparent to-black/30',
+      texture: `${gemSheen} ${dotNoise}`,
+      ring: 'ring-1 ring-fuchsia-200/25',
+    };
+  if (title.includes('鑽石'))
+    return {
+      bg: 'from-cyan-500 via-blue-600 to-indigo-900',
+      text: 'from-cyan-50 to-white',
+      icon: 'text-cyan-100',
+      sheen: 'bg-gradient-to-t from-black/25 via-transparent to-white/20',
+      texture: `${gemSheen} ${dotNoise}`,
+      ring: 'ring-1 ring-cyan-200/30',
+    };
+  if (title.includes('翡翠'))
+    return {
+      bg: 'from-emerald-500 via-teal-700 to-green-950',
+      text: 'from-emerald-50 to-green-100',
+      icon: 'text-emerald-100',
+      sheen: 'bg-gradient-to-tr from-white/20 via-transparent to-emerald-950/40',
+      texture: 'bg-[radial-gradient(ellipse_at_50%_120%,rgba(16,185,129,0.35),transparent_55%)] opacity-60',
+      ring: 'ring-1 ring-emerald-200/25',
+    };
+  if (title.includes('藍寶石'))
+    return {
+      bg: 'from-blue-500 via-indigo-700 to-blue-950',
+      text: 'from-blue-50 to-indigo-100',
+      icon: 'text-blue-100',
+      sheen: 'bg-gradient-to-bl from-white/18 via-transparent to-indigo-950/45',
+      texture: `${lineNoise}`,
+      ring: 'ring-1 ring-blue-200/25',
+    };
+  if (title.includes('紅寶石'))
+    return {
+      bg: 'from-rose-500 via-red-700 to-rose-950',
+      text: 'from-rose-50 to-red-100',
+      icon: 'text-rose-100',
+      sheen: 'bg-gradient-to-t from-black/30 via-transparent to-rose-200/25',
+      texture: `${gemSheen} opacity-50`,
+      ring: 'ring-1 ring-rose-200/25',
+    };
+  if (title.includes('白金'))
+    return {
+      bg: 'from-slate-300 via-slate-500 to-slate-800',
+      text: 'from-white to-slate-100',
+      icon: 'text-slate-100',
+      sheen: 'bg-gradient-to-br from-white/35 via-transparent to-slate-900/35',
+      texture: `${lineNoise} mix-blend-soft-light`,
+      ring: 'ring-1 ring-white/30',
+    };
+  if (title.includes('金章'))
+    return {
+      bg: 'from-amber-400 via-yellow-500 to-amber-800',
+      text: 'from-yellow-50 to-amber-100',
+      icon: 'text-amber-100',
+      sheen: 'bg-gradient-to-tr from-white/40 via-amber-200/15 to-amber-900/35',
+      texture: `${lineNoise} mix-blend-overlay`,
+      ring: 'ring-1 ring-amber-100/40',
+    };
+  if (title.includes('銀章'))
+    return {
+      bg: 'from-zinc-300 via-zinc-500 to-zinc-800',
+      text: 'from-zinc-50 to-white',
+      icon: 'text-zinc-100',
+      sheen: 'bg-gradient-to-br from-white/30 via-transparent to-zinc-900/40',
+      texture: `${lineNoise}`,
+      ring: 'ring-1 ring-white/25',
+    };
+  if (title.includes('銅章') || title.includes('初階'))
+    return {
+      bg: 'from-orange-400 via-amber-600 to-orange-950',
+      text: 'from-orange-50 to-amber-100',
+      icon: 'text-orange-100',
+      sheen: 'bg-gradient-to-t from-black/20 via-transparent to-amber-200/20',
+      texture: `${dotNoise} opacity-25`,
+      ring: 'ring-1 ring-orange-200/25',
+    };
+  return {
+    bg: 'from-slate-700 via-slate-800 to-slate-950',
+    text: 'from-slate-100 to-slate-300',
+    icon: 'text-slate-300',
+    sheen: 'bg-gradient-to-b from-white/10 via-transparent to-black/35',
+    texture: `${dotNoise} opacity-20`,
+    ring: 'ring-1 ring-white/10',
+  };
 };
 
 // --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
@@ -1179,10 +1265,22 @@ function AppInner() {
     const cardStyle = getStyleByTitle(currentTitle);
 
     return (
-      <div className="space-y-5 animate-fadeIn pb-6">
+      <div className="space-y-5 animate-fadeIn pb-6 relative">
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 rounded-[2rem] bg-[radial-gradient(ellipse_at_50%_0%,rgba(99,102,241,0.12),transparent_55%)]"
+          aria-hidden
+        />
+
         {/* Player Profile / Level Card */}
-        <div className={`bg-gradient-to-br ${cardStyle.bg} rounded-2xl p-4 shadow-lg text-white relative overflow-hidden transition-all duration-500`}>
-          
+        <div
+          className={`relative rounded-2xl p-4 shadow-lg text-white overflow-hidden transition-all duration-500 ${cardStyle.ring || ''}`}
+        >
+          <div className={`absolute inset-0 bg-gradient-to-br ${cardStyle.bg}`} />
+          <div className={`absolute inset-0 ${cardStyle.sheen}`} />
+          {cardStyle.texture ? (
+            <div className={`absolute inset-0 pointer-events-none ${cardStyle.texture}`} />
+          ) : null}
+
           <div className="flex justify-between items-center mb-2 relative z-10">
              <span className="bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-black tracking-wider border border-white/10">
                LV.{level}
@@ -1218,8 +1316,16 @@ function AppInner() {
         </div>
 
         {/* 今日指引（獨立匡格） */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-2">
+        <div className="relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
+          <div
+            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-100/80 blur-3xl"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -left-6 bottom-0 h-28 w-28 rounded-full bg-violet-100/60 blur-2xl"
+            aria-hidden
+          />
+          <div className="relative z-10 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 border border-indigo-100">
                 <BookOpen size={18} className="text-indigo-600" />
@@ -1234,7 +1340,7 @@ function AppInner() {
           </div>
 
           {guidanceDrawing ? (
-            <div className="anim-guidance-draw-panel relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8">
+            <div className="anim-guidance-draw-panel relative z-10 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 px-4 py-8">
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-30">
                 <div className="h-36 w-36 shrink-0 rounded-full bg-[conic-gradient(from_0deg,transparent,rgba(99,102,241,0.35),transparent)] anim-guidance-orbit" />
               </div>
@@ -1252,7 +1358,7 @@ function AppInner() {
           ) : guidanceDrawsToday.length > 0 ? (
             <div
               key={guidanceRevealNonce}
-              className={`rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ${guidanceRevealNonce > 0 ? 'anim-guidance-reveal' : ''}`}
+              className={`relative z-10 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ${guidanceRevealNonce > 0 ? 'anim-guidance-reveal' : ''}`}
             >
               <p className="text-center text-sm font-bold leading-relaxed text-slate-800">
                 「{guidanceDrawsToday[0]}」
@@ -1262,7 +1368,7 @@ function AppInner() {
             <button
               type="button"
               onClick={handleDrawTodayGuidance}
-              className="group relative w-full overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50 py-3.5 text-center font-black text-indigo-700 shadow-sm transition-all active:scale-[0.99] md:hover:bg-indigo-100/70"
+              className="group relative z-10 w-full overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50 py-3.5 text-center font-black text-indigo-700 shadow-sm transition-all active:scale-[0.99] md:hover:bg-indigo-100/70"
             >
               <span className="relative flex items-center justify-center gap-2">
                 <Sparkles size={18} className="text-amber-500" />
@@ -1273,8 +1379,12 @@ function AppInner() {
         </div>
 
         {/* --- 今日比賽數據區塊 --- */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
-           <div className="flex justify-between items-end mb-1">
+        <div className="relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.35] bg-[linear-gradient(rgba(99,102,241,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.06)_1px,transparent_1px)] bg-[length:14px_14px]"
+            aria-hidden
+          />
+           <div className="relative z-10 flex justify-between items-end mb-1">
               <div>
                 <h2 className="text-xl font-bold text-gray-800">今日比賽數據</h2>
                 <p className="text-xs text-gray-500 mt-1">點擊增加，長按可歸零</p>
@@ -1287,7 +1397,7 @@ function AppInner() {
 
            {/* Double Double / 大三元 標示 */}
            {(statRewards.all || statRewards.doubleDouble) && (
-             <div className="mb-2 mt-1 animate-fadeIn">
+             <div className="relative z-10 mb-2 mt-1 animate-fadeIn">
                 {statRewards.all ? (
                   <p className="text-amber-600 text-sm font-bold flex items-center justify-center gap-1 bg-amber-50 py-1.5 rounded-lg border border-amber-100">
                     <Sparkles size={16} /> 大三元達成！
@@ -1300,7 +1410,7 @@ function AppInner() {
              </div>
            )}
            
-           <div className="grid grid-cols-3 gap-3 text-center">
+           <div className="relative z-10 grid grid-cols-3 gap-3 text-center">
               <button 
                 onPointerDown={() => handlePointerDown('contacts')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('contacts', e)}
                 className="bg-emerald-50 md:hover:bg-emerald-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-emerald-100 select-none shadow-sm relative"
@@ -1331,8 +1441,12 @@ function AppInner() {
         </div>
 
         {/* 整合至首頁的 今日比賽 */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
-          <div className="flex justify-between items-start">
+        <div className="relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.12] bg-[radial-gradient(circle_at_1px_1px,rgba(99,102,241,0.35)_1px,transparent_0)] bg-[length:10px_10px]"
+            aria-hidden
+          />
+          <div className="relative z-10 flex justify-between items-start">
             <div>
               <h2 className="text-xl font-bold text-gray-800">今日比賽</h2>
               <p className="text-gray-500 text-xs mt-0.5">達成全部目標即獲勝</p>
@@ -1344,12 +1458,12 @@ function AppInner() {
           </div>
 
           {bingoStats.isWin && (
-             <p className="text-green-600 text-sm font-bold flex items-center justify-center gap-1 bg-green-50 py-1.5 rounded-lg border border-green-100">
+             <p className="relative z-10 text-green-600 text-sm font-bold flex items-center justify-center gap-1 bg-green-50 py-1.5 rounded-lg border border-green-100">
                <Sparkles size={16}/> 恭喜贏下今日比賽！
              </p>
           )}
 
-          <div className="grid grid-cols-3 gap-2 md:gap-3 relative mt-1">
+          <div className="relative z-10 grid grid-cols-3 gap-2 md:gap-3 mt-1">
             {habits.map((habit, index) => (
               <div 
                 key={index}
@@ -1378,13 +1492,25 @@ function AppInner() {
   };
 
   const renderFailures = () => (
-    <div className="space-y-4 animate-fadeIn">
-      <div className="bg-white rounded-3xl p-6 text-center border border-indigo-50 shadow-sm relative overflow-hidden">
-        <h2 className="text-2xl font-bold text-gray-800 mb-1">學習紀錄</h2>
-        <p className="text-gray-600 text-sm mb-3 leading-relaxed px-1">
+    <div className="relative space-y-4 animate-fadeIn">
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 rounded-[2rem] bg-[radial-gradient(ellipse_at_40%_0%,rgba(251,191,36,0.14),transparent_55%)]"
+        aria-hidden
+      />
+      <div className="relative overflow-hidden bg-white rounded-3xl p-6 text-center border border-indigo-50 shadow-sm">
+        <div
+          className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-amber-100/70 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-indigo-100/50 blur-2xl"
+          aria-hidden
+        />
+        <h2 className="relative z-10 text-2xl font-bold text-gray-800 mb-1">學習紀錄</h2>
+        <p className="relative z-10 text-gray-600 text-sm mb-3 leading-relaxed px-1">
           失敗為成功之母，每次失敗都是一次學習，把它們記錄下來，賺取經驗值！
         </p>
-        <div className="flex justify-center mb-4">
+        <div className="relative z-10 flex justify-center mb-4">
            <span className="bg-white text-indigo-700 font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-1.5 shadow-sm border border-indigo-100">
              <Sparkles size={16} className="text-amber-500" /> 累計紀錄：{failures.length} 次
            </span>
@@ -1399,11 +1525,11 @@ function AppInner() {
         )}
 
         {failureTypes.length === 0 && (
-          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl py-3 px-3 mb-4">
+          <p className="relative z-10 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl py-3 px-3 mb-4">
             尚未設定快捷按鈕，請至「設定」新增。
           </p>
         )}
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="relative z-10 grid grid-cols-2 gap-2 mb-4">
           {failureTypes.map((type) => {
             const IconComponent = ICON_MAP[type.iconKey] || Mail;
             return (
@@ -1422,28 +1548,32 @@ function AppInner() {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
-        <div className="flex items-center justify-between mb-2">
+      <div className="relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.2] bg-[radial-gradient(circle_at_1px_1px,rgba(99,102,241,0.25)_1px,transparent_0)] bg-[length:9px_9px]"
+          aria-hidden
+        />
+        <div className="relative z-10 flex items-center justify-between mb-2">
           <p className="text-sm font-black text-gray-800">學習歷史紀錄</p>
         </div>
         {failures.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+          <p className="relative z-10 text-sm text-gray-400 text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
             尚無紀錄
           </p>
         ) : (
-          <ul className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
+          <ul className="relative z-10 space-y-2 max-h-72 overflow-y-auto pr-0.5">
             {failures.map((f) => (
               <li
                 key={f.id}
                 className="flex items-start gap-2 bg-white rounded-2xl border border-slate-100 px-3 py-2.5 shadow-sm"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-indigo-500 font-mono tabular-nums">
-                    {formatFailureRecordedAt(f.recordedAt)}
+                  <p className="text-sm font-bold text-gray-900 leading-snug">
+                    <span className="text-gray-900">{f.label}</span>
+                    <span className="text-amber-600 font-black ml-1.5 tabular-nums">+{f.exp} EXP</span>
                   </p>
-                  <p className="text-sm font-bold text-gray-800 mt-0.5 break-words">{f.text}</p>
-                  <p className="text-[10px] text-amber-600 font-bold mt-1">
-                    +{f.exp} EXP · {f.label}
+                  <p className="text-[11px] text-slate-500 font-mono tabular-nums mt-0.5">
+                    {formatFailureRecordedAt(f.recordedAt)}
                   </p>
                   {editingFailureId === f.id && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1525,13 +1655,21 @@ function AppInner() {
 
   const renderStats = () => {
     return (
-      <div className="space-y-6 animate-fadeIn pb-8">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4">
-          <p className="text-xs text-slate-500 mb-2">本季目前戰績</p>
-          <p className="text-2xl font-bold text-slate-800 tabular-nums">
+      <div className="relative space-y-6 animate-fadeIn pb-8">
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 rounded-[2rem] bg-[radial-gradient(ellipse_at_50%_0%,rgba(14,165,233,0.12),transparent_58%)]"
+          aria-hidden
+        />
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4">
+          <div
+            className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-sky-200/40 blur-3xl"
+            aria-hidden
+          />
+          <p className="relative z-10 text-xs text-slate-500 mb-2">本季目前戰績</p>
+          <p className="relative z-10 text-2xl font-bold text-slate-800 tabular-nums">
             {seasonRecord.wins} 勝 <span className="text-slate-300 font-normal">·</span> {seasonRecord.losses} 負
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="relative z-10 mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
               <p className="text-[10px] text-slate-500 font-bold mb-0.5">累積大三元</p>
               <p className="text-lg font-black text-slate-800 tabular-nums">{milestoneCounts.tripleDouble}</p>
@@ -1544,7 +1682,11 @@ function AppInner() {
         </div>
 
         {/* 本季平均數據 (移至上方, 最醒目) */}
-        <div className="bg-indigo-50/70 rounded-3xl p-5 shadow-sm border border-indigo-100 relative overflow-hidden">
+        <div className="relative overflow-hidden bg-indigo-50/70 rounded-3xl p-5 shadow-sm border border-indigo-100">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.25] bg-[linear-gradient(rgba(99,102,241,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.07)_1px,transparent_1px)] bg-[length:16px_16px]"
+            aria-hidden
+          />
           <div className="absolute top-0 right-0 p-3 opacity-[0.06] text-indigo-900">
             <Crosshair size={90} />
           </div>
@@ -1568,7 +1710,11 @@ function AppInner() {
         </div>
 
         {/* 本季累積數據面板 (顏色變淡) */}
-        <div className="bg-blue-50 rounded-3xl p-5 shadow-sm border border-blue-100 relative overflow-hidden">
+        <div className="relative overflow-hidden bg-blue-50 rounded-3xl p-5 shadow-sm border border-blue-100">
+          <div
+            className="pointer-events-none absolute -left-6 bottom-0 h-40 w-40 rounded-full bg-indigo-200/30 blur-3xl"
+            aria-hidden
+          />
           <div className="absolute top-0 right-0 p-3 opacity-5 text-blue-900">
             <Award size={80} />
           </div>
@@ -1594,11 +1740,15 @@ function AppInner() {
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
-          <h3 className="font-black text-gray-800 mb-3 flex items-center gap-2">
+        <div className="relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.35] bg-[linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px)] bg-[length:100%_8px]"
+            aria-hidden
+          />
+          <h3 className="relative z-10 font-black text-gray-800 mb-3 flex items-center gap-2">
             <BarChart2 size={18} className="text-blue-600" /> 數據歷史紀錄
           </h3>
-          <div className="space-y-2">
+          <div className="relative z-10 space-y-2">
             {[...businessRecords].reverse().map((record, index) => {
               const realIndex = businessRecords.length - 1 - index;
               const isEditing = editingBusinessRecordIndex === realIndex;
@@ -2067,8 +2217,18 @@ function AppInner() {
           </div>
         </header>
 
-        {/* Content Area */}
-        <main className="p-4">
+        {/* Content Area（設定頁維持素底；其餘分頁加淡色氛圍） */}
+        <main
+          className={`p-4 ${
+            activeTab === 'home'
+              ? 'bg-gradient-to-b from-indigo-50/50 via-slate-50 to-slate-50'
+              : activeTab === 'failures'
+                ? 'bg-gradient-to-b from-amber-50/40 via-orange-50/15 to-slate-50'
+                : activeTab === 'stats'
+                  ? 'bg-gradient-to-b from-sky-50/45 via-indigo-50/10 to-slate-50'
+                  : ''
+          }`}
+        >
           {activeTab === 'home' && renderHome()}
           {activeTab === 'failures' && renderFailures()}
           {activeTab === 'stats' && renderStats()}
