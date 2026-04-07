@@ -1632,23 +1632,7 @@ function AppInner() {
            </span>
         </div>
         
-        {showCelebrate && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-indigo-900/85 backdrop-blur-md">
-            <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
-              <div className="w-[150vw] h-[150vw] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.10)_350deg,transparent_360deg)] anim-spin-slow opacity-60 rounded-full"></div>
-              <div className="w-[100vw] h-[100vw] border-[4vw] border-dashed border-white/10 rounded-full anim-spin-slow absolute opacity-40"></div>
-            </div>
-            <div className="relative z-10 w-11/12 max-w-md text-center px-6">
-              <Sparkles size={54} className="mx-auto text-amber-400 drop-shadow-[0_0_30px_rgba(251,191,36,0.6)] anim-celebrate-pop" />
-              <p className="mt-5 text-2xl font-black text-white leading-relaxed drop-shadow-lg">
-                「{failureQuote}」
-              </p>
-              <p className="mt-5 text-3xl font-black text-amber-300 tabular-nums drop-shadow-[0_0_18px_rgba(251,191,36,0.45)]">
-                +{recentExpGain} EXP
-              </p>
-            </div>
-          </div>
-        )}
+        {/* 金句動畫已移到全域 overlay，避免在手機上被匡格影響定位 */}
 
         {failureTypes.length === 0 && (
           <p className="relative z-10 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl py-3 px-3 mb-4">
@@ -2463,6 +2447,36 @@ function AppInner() {
           </div>
         )}
 
+        {/* --- 學習紀錄金句滿版動畫 --- */}
+        {showCelebrate && (
+          <div
+            className="fixed inset-0 z-[220] flex items-center justify-center bg-indigo-900/85 backdrop-blur-md px-6 pt-safe pb-safe"
+            onClick={() => setShowCelebrate(false)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setShowCelebrate(false);
+            }}
+          >
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
+              <div className="w-[150vw] h-[150vw] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.10)_350deg,transparent_360deg)] anim-spin-slow opacity-60 rounded-full"></div>
+              <div className="w-[100vw] h-[100vw] border-[4vw] border-dashed border-white/10 rounded-full anim-spin-slow absolute opacity-40"></div>
+            </div>
+            <div className="relative z-10 w-full max-w-md text-center">
+              <Sparkles
+                size={56}
+                className="mx-auto text-amber-400 drop-shadow-[0_0_30px_rgba(251,191,36,0.6)] anim-celebrate-pop"
+              />
+              <p className="mt-6 text-2xl font-black text-white leading-relaxed drop-shadow-lg">
+                「{failureQuote}」
+              </p>
+              <p className="mt-6 text-3xl font-black text-amber-300 tabular-nums drop-shadow-[0_0_18px_rgba(251,191,36,0.45)]">
+                +{recentExpGain} EXP
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 w-full max-w-md bg-white border-t border-gray-100 px-1 py-2 flex justify-between items-stretch shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-50 rounded-t-3xl pb-safe">
           <button onClick={() => setActiveTab('home')} className={`relative flex flex-col items-center gap-0.5 p-1.5 flex-1 min-w-0 transition-colors ${activeTab === 'home' ? 'text-indigo-600' : 'text-gray-400'}`}>
@@ -2538,6 +2552,9 @@ function AppInner() {
         }
         .pb-safe {
           padding-bottom: env(safe-area-inset-bottom, 1rem);
+        }
+        .pt-safe {
+          padding-top: env(safe-area-inset-top, 1rem);
         }
         @keyframes guidanceReveal {
           0% { opacity: 0; transform: translateY(14px) scale(0.94); filter: blur(8px); }
