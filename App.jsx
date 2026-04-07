@@ -130,11 +130,12 @@ const FAILURE_QUOTES = [
   "下一場對話，你會比上一場更從容。"
 ];
 
-const MILESTONES = {
-  7: 20, 14: 50, 21: 100, 30: 200, 45: 300, 60: 500, 100: 1000
-};
+const STREAK_MILESTONE_SET = new Set([3, 7, 14, 21, 30, 40, 50, 60, 70, 80, 90, 100]);
 
-const TRIPLE_MILESTONES = { 3: 15, 7: 30, 14: 50, 21: 100 };
+function getStreakMilestoneBonus(n) {
+  const x = Number(n) || 0;
+  return STREAK_MILESTONE_SET.has(x) ? x : 0;
+}
 
 const WIN_LINES = [
   [0, 1, 2], [3, 4, 5], [6, 7, 8], // 橫線
@@ -1141,10 +1142,8 @@ function AppInner() {
       setShowFullWinAnim(true);
       setTimeout(() => setShowFullWinAnim(false), 3000);
       
-      if (MILESTONES[newStreak]) {
-        const bonus = MILESTONES[newStreak];
-        setBaseExp(prev => prev + bonus);
-      }
+      const bonus = getStreakMilestoneBonus(newStreak);
+      if (bonus > 0) setBaseExp((prev) => prev + bonus);
     }
   }, [bingoStats.isWin, hasWonToday, streak]);
 
@@ -1221,15 +1220,12 @@ function AppInner() {
       newStreak += 1;
       setTripleDoubleStreak(newStreak);
       
-      if (TRIPLE_MILESTONES[newStreak]) {
-         streakBonusToAlert = TRIPLE_MILESTONES[newStreak];
-         expChange += streakBonusToAlert;
-      }
+      streakBonusToAlert = getStreakMilestoneBonus(newStreak);
+      if (streakBonusToAlert > 0) expChange += streakBonusToAlert;
     } else if (metCount < 3 && newRewards.all) {
       expChange -= 10; newRewards.all = false;
-      if (TRIPLE_MILESTONES[newStreak]) {
-         expChange -= TRIPLE_MILESTONES[newStreak];
-      }
+      const rollbackBonus = getStreakMilestoneBonus(newStreak);
+      if (rollbackBonus > 0) expChange -= rollbackBonus;
       newStreak = Math.max(0, newStreak - 1);
       setTripleDoubleStreak(newStreak);
     }
