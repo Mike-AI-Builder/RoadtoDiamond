@@ -580,6 +580,8 @@ export default function App() {
 
   // --- Stats State ---
   const [businessRecords, setBusinessRecords] = useState(INITIAL_GAME.businessRecords);
+  const [editingBusinessRecordIndex, setEditingBusinessRecordIndex] = useState(null);
+  const [draftBusinessRecord, setDraftBusinessRecord] = useState({ contacts: 0, gatherings: 0, strangers: 0 });
   
   // --- Match Stats (Today) State ---
   const [todayStats, setTodayStats] = useState(INITIAL_GAME.todayStats);
@@ -880,6 +882,19 @@ export default function App() {
     };
   }, [businessRecords, todayStats]);
 
+  const milestoneCounts = useMemo(() => {
+    const all = [...businessRecords, todayStats];
+    return all.reduce(
+      (acc, r) => {
+        const m = getDayMilestones(r);
+        if (m.doubleDouble) acc.doubleDouble += 1;
+        if (m.tripleDouble) acc.tripleDouble += 1;
+        return acc;
+      },
+      { doubleDouble: 0, tripleDouble: 0 }
+    );
+  }, [businessRecords, todayStats, statTargets]);
+
   useEffect(() => {
     if (bingoStats.isWin && !hasWonToday) {
       setHasWonToday(true);
@@ -1067,6 +1082,17 @@ export default function App() {
     return exp;
   };
 
+  const getDayMilestones = (stats) => {
+    const c = Number(stats.contacts) >= statTargets.contacts.target;
+    const g = Number(stats.gatherings) >= statTargets.gatherings.target;
+    const s = Number(stats.strangers) >= statTargets.strangers.target;
+    const metCount = [c, g, s].filter(Boolean).length;
+    return {
+      doubleDouble: metCount >= 2,
+      tripleDouble: metCount === 3,
+    };
+  };
+
   const updateHistory = (index, field, value) => {
     const oldRecord = businessRecords[index];
     const newRecord = { ...oldRecord, [field]: Number(value) || 0 };
@@ -1201,7 +1227,7 @@ export default function App() {
             <button
               type="button"
               onClick={handleDrawTodayGuidance}
-              className="group relative w-full overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50 py-3.5 text-center font-black text-indigo-700 shadow-sm transition-all active:scale-[0.99] hover:bg-indigo-100/70"
+              className="group relative w-full overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50 py-3.5 text-center font-black text-indigo-700 shadow-sm transition-all active:scale-[0.99] md:hover:bg-indigo-100/70"
             >
               <span className="relative flex items-center justify-center gap-2">
                 <Sparkles size={18} className="text-amber-500" />
@@ -1242,7 +1268,7 @@ export default function App() {
            <div className="grid grid-cols-3 gap-3 text-center">
               <button 
                 onPointerDown={() => handlePointerDown('contacts')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('contacts', e)}
-                className="bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-emerald-100 select-none shadow-sm relative"
+                className="bg-emerald-50 md:hover:bg-emerald-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-emerald-100 select-none shadow-sm relative"
               >
                 <span className="text-xs font-bold text-emerald-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.contacts.label}</span>
                 <span className="text-2xl font-black text-emerald-600 leading-none">{todayStats.contacts}</span>
@@ -1251,7 +1277,7 @@ export default function App() {
               
               <button 
                 onPointerDown={() => handlePointerDown('gatherings')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('gatherings', e)}
-                className="bg-blue-50 hover:bg-blue-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-blue-100 select-none shadow-sm relative"
+                className="bg-blue-50 md:hover:bg-blue-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-blue-100 select-none shadow-sm relative"
               >
                 <span className="text-xs font-bold text-blue-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.gatherings.label}</span>
                 <span className="text-2xl font-black text-blue-600 leading-none">{todayStats.gatherings}</span>
@@ -1260,7 +1286,7 @@ export default function App() {
               
               <button 
                 onPointerDown={() => handlePointerDown('strangers')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('strangers', e)}
-                className="bg-purple-50 hover:bg-purple-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-purple-100 select-none shadow-sm relative"
+                className="bg-purple-50 md:hover:bg-purple-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-purple-100 select-none shadow-sm relative"
               >
                 <span className="text-xs font-bold text-purple-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.strangers.label}</span>
                 <span className="text-2xl font-black text-purple-600 leading-none">{todayStats.strangers}</span>
@@ -1297,7 +1323,7 @@ export default function App() {
                   relative aspect-square rounded-2xl flex items-center justify-center p-2 text-center transition-all duration-300 cursor-pointer select-none
                   ${gridState[index] 
                     ? 'bg-indigo-50 text-indigo-700 border-2 border-indigo-300 shadow-sm scale-95' 
-                    : 'bg-gray-50 hover:bg-indigo-50 text-gray-700 border border-gray-100'}
+                    : 'bg-gray-50 md:hover:bg-indigo-50 text-gray-700 border border-gray-100'}
                 `}
               >
                 <>
@@ -1317,7 +1343,7 @@ export default function App() {
   };
 
   const renderFailures = () => (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-4 animate-fadeIn">
       <div className="bg-gradient-to-br from-sky-50 via-indigo-50 to-violet-50 rounded-3xl p-6 text-center border border-indigo-100 relative overflow-hidden">
         <h2 className="text-2xl font-bold text-gray-800 mb-1">學習紀錄</h2>
         <p className="text-gray-600 text-sm mb-3 leading-relaxed px-1">
@@ -1350,7 +1376,7 @@ export default function App() {
                 key={type.id}
                 type="button"
                 onClick={() => recordFailure({ label: type.label, exp: type.exp })}
-                className="bg-white hover:bg-indigo-50 active:scale-95 transition-all p-3 rounded-xl border border-indigo-100 shadow-sm flex flex-col items-center justify-center gap-1"
+                className="bg-white md:hover:bg-indigo-50 active:scale-95 transition-all p-3 rounded-xl border border-indigo-100 shadow-sm flex flex-col items-center justify-center gap-1"
               >
                 <div className="text-indigo-500 mb-1"><IconComponent size={24} /></div>
                 <span className="text-xs font-bold text-gray-700 leading-snug">{type.label}</span>
@@ -1359,105 +1385,105 @@ export default function App() {
             );
           })}
         </div>
+      </div>
 
-        <div className="mt-5 pt-4 border-t border-indigo-100 text-left">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-bold text-gray-700">記錄列表</p>
-          </div>
-          {failures.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6 bg-white/50 rounded-xl border border-dashed border-indigo-100">
-              尚無紀錄，點擊上方類型開始累積
-            </p>
-          ) : (
-            <ul className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
-              {failures.map((f) => (
-                <li
-                  key={f.id}
-                  className="flex items-start gap-2 bg-white/90 rounded-xl border border-indigo-100/80 px-3 py-2.5 shadow-sm"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] text-indigo-500 font-mono tabular-nums">
-                      {formatFailureRecordedAt(f.recordedAt)}
-                    </p>
-                    <p className="text-sm font-bold text-gray-800 mt-0.5 break-words">{f.text}</p>
-                    <p className="text-[10px] text-amber-600 font-bold mt-1">
-                      +{f.exp} EXP · {f.label}
-                    </p>
-                    {editingFailureId === f.id && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <input
-                          type="datetime-local"
-                          step={60}
-                          value={draftFailureDateTime}
-                          onChange={(e) => setDraftFailureDateTime(e.target.value)}
-                          className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-700"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextIso = localMinuteInputValueToIso(draftFailureDateTime);
-                            if (!nextIso) return;
-                            const nextDate = nextIso.split('T')[0];
-                            setFailures((prev) =>
-                              prev.map((x) =>
-                                x.id === f.id
-                                  ? {
-                                      ...x,
-                                      date: nextDate,
-                                      recordedAt: nextIso,
-                                    }
-                                  : x
-                              )
-                            );
-                            setEditingFailureId(null);
-                            setDraftFailureDateTime('');
-                          }}
-                          className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-white hover:bg-slate-700"
-                        >
-                          儲存
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingFailureId(null);
-                            setDraftFailureDateTime('');
-                          }}
-                          className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                        >
-                          取消
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (editingFailureId === f.id) {
-                        setEditingFailureId(null);
-                        setDraftFailureDateTime('');
-                        return;
-                      }
-                      setEditingFailureId(f.id);
-                      setDraftFailureDateTime(isoToLocalMinuteInputValue(f.recordedAt));
-                    }}
-                    className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                    aria-label="修正日期"
-                  >
-                    <Edit3 size={18} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeFailure(f.id)}
-                    className="shrink-0 p-2 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                    aria-label="刪除此筆學習紀錄"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+      <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-black text-gray-800">記錄列表</p>
         </div>
+        {failures.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            尚無紀錄
+          </p>
+        ) : (
+          <ul className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
+            {failures.map((f) => (
+              <li
+                key={f.id}
+                className="flex items-start gap-2 bg-white rounded-2xl border border-slate-100 px-3 py-2.5 shadow-sm"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-indigo-500 font-mono tabular-nums">
+                    {formatFailureRecordedAt(f.recordedAt)}
+                  </p>
+                  <p className="text-sm font-bold text-gray-800 mt-0.5 break-words">{f.text}</p>
+                  <p className="text-[10px] text-amber-600 font-bold mt-1">
+                    +{f.exp} EXP · {f.label}
+                  </p>
+                  {editingFailureId === f.id && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        type="datetime-local"
+                        step={60}
+                        value={draftFailureDateTime}
+                        onChange={(e) => setDraftFailureDateTime(e.target.value)}
+                        className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextIso = localMinuteInputValueToIso(draftFailureDateTime);
+                          if (!nextIso) return;
+                          const nextDate = nextIso.split('T')[0];
+                          setFailures((prev) =>
+                            prev.map((x) =>
+                              x.id === f.id
+                                ? {
+                                    ...x,
+                                    date: nextDate,
+                                    recordedAt: nextIso,
+                                  }
+                                : x
+                            )
+                          );
+                          setEditingFailureId(null);
+                          setDraftFailureDateTime('');
+                        }}
+                        className="text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-white md:hover:bg-slate-700"
+                      >
+                        儲存
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingFailureId(null);
+                          setDraftFailureDateTime('');
+                        }}
+                        className="text-xs font-bold px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 md:hover:bg-slate-50"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (editingFailureId === f.id) {
+                      setEditingFailureId(null);
+                      setDraftFailureDateTime('');
+                      return;
+                    }
+                    setEditingFailureId(f.id);
+                    setDraftFailureDateTime(isoToLocalMinuteInputValue(f.recordedAt));
+                  }}
+                  className="shrink-0 p-2 rounded-lg text-gray-400 md:hover:text-slate-700 md:hover:bg-slate-100 transition-colors"
+                  aria-label="修正"
+                >
+                  <Edit3 size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeFailure(f.id)}
+                  className="shrink-0 p-2 rounded-lg text-gray-400 md:hover:text-rose-600 md:hover:bg-rose-50 transition-colors"
+                  aria-label="刪除"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -1470,6 +1496,16 @@ export default function App() {
           <p className="text-2xl font-bold text-slate-800 tabular-nums">
             {seasonRecord.wins} 勝 <span className="text-slate-300 font-normal">·</span> {seasonRecord.losses} 負
           </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <p className="text-[10px] text-slate-500 font-bold mb-0.5">累積大三元</p>
+              <p className="text-lg font-black text-slate-800 tabular-nums">{milestoneCounts.tripleDouble}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <p className="text-[10px] text-slate-500 font-bold mb-0.5">累積 Double Double</p>
+              <p className="text-lg font-black text-slate-800 tabular-nums">{milestoneCounts.doubleDouble}</p>
+            </div>
+          </div>
         </div>
 
         {/* 本季平均數據 (移至上方, 最醒目) */}
@@ -1525,39 +1561,95 @@ export default function App() {
 
         <div>
           <h3 className="font-bold text-gray-700 mb-3 ml-2 flex items-center gap-2">
-            <BarChart2 size={18} className="text-blue-500" /> 歷史紀錄 (點擊數字可直接修改)
+            <BarChart2 size={18} className="text-blue-500" /> 歷史紀錄
           </h3>
           <div className="space-y-2">
             {[...businessRecords].reverse().map((record, index) => {
               const realIndex = businessRecords.length - 1 - index;
+              const isEditing = editingBusinessRecordIndex === realIndex;
               return (
-              <div key={realIndex} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex justify-between items-center hover:bg-blue-50/50 transition-colors">
+              <div key={realIndex} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex justify-between items-center md:hover:bg-blue-50/50 transition-colors">
                 <span className="text-sm font-bold text-gray-500 w-24">{record.date}</span>
-                <div className="flex gap-2 text-sm">
+                <div className="flex items-center gap-2 text-sm">
                   <span className="flex items-center gap-1 text-emerald-600">
                     <MessageCircle size={14}/> 
                     <input 
-                      type="number" min="0" value={record.contacts} 
-                      onChange={e => updateHistory(realIndex, 'contacts', e.target.value)} 
-                      className="w-10 h-7 bg-emerald-50 border border-emerald-100 rounded text-center outline-none focus:ring-1 focus:ring-emerald-400 font-bold" 
+                      type="number"
+                      min="0"
+                      value={isEditing ? draftBusinessRecord.contacts : record.contacts}
+                      disabled={!isEditing}
+                      onChange={e => setDraftBusinessRecord((p) => ({ ...p, contacts: Number(e.target.value) || 0 }))}
+                      className={`w-10 h-7 border rounded text-center outline-none font-bold tabular-nums ${isEditing ? 'bg-emerald-50 border-emerald-100 focus:ring-1 focus:ring-emerald-400' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                     />
                   </span>
                   <span className="flex items-center gap-1 text-blue-600">
                     <Users size={14}/> 
                     <input 
-                      type="number" min="0" value={record.gatherings} 
-                      onChange={e => updateHistory(realIndex, 'gatherings', e.target.value)} 
-                      className="w-10 h-7 bg-blue-50 border border-blue-100 rounded text-center outline-none focus:ring-1 focus:ring-blue-400 font-bold" 
+                      type="number"
+                      min="0"
+                      value={isEditing ? draftBusinessRecord.gatherings : record.gatherings}
+                      disabled={!isEditing}
+                      onChange={e => setDraftBusinessRecord((p) => ({ ...p, gatherings: Number(e.target.value) || 0 }))}
+                      className={`w-10 h-7 border rounded text-center outline-none font-bold tabular-nums ${isEditing ? 'bg-blue-50 border-blue-100 focus:ring-1 focus:ring-blue-400' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                     />
                   </span>
                   <span className="flex items-center gap-1 text-purple-600">
                     <TrendingUp size={14}/> 
                     <input 
-                      type="number" min="0" value={record.strangers} 
-                      onChange={e => updateHistory(realIndex, 'strangers', e.target.value)} 
-                      className="w-10 h-7 bg-purple-50 border border-purple-100 rounded text-center outline-none focus:ring-1 focus:ring-purple-400 font-bold" 
+                      type="number"
+                      min="0"
+                      value={isEditing ? draftBusinessRecord.strangers : record.strangers}
+                      disabled={!isEditing}
+                      onChange={e => setDraftBusinessRecord((p) => ({ ...p, strangers: Number(e.target.value) || 0 }))}
+                      className={`w-10 h-7 border rounded text-center outline-none font-bold tabular-nums ${isEditing ? 'bg-purple-50 border-purple-100 focus:ring-1 focus:ring-purple-400' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                     />
                   </span>
+                </div>
+                <div className="ml-2 flex items-center gap-1">
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateHistory(realIndex, 'contacts', draftBusinessRecord.contacts);
+                          updateHistory(realIndex, 'gatherings', draftBusinessRecord.gatherings);
+                          updateHistory(realIndex, 'strangers', draftBusinessRecord.strangers);
+                          setEditingBusinessRecordIndex(null);
+                        }}
+                        className="p-2 rounded-lg text-slate-600 md:hover:bg-slate-100 md:hover:text-slate-800"
+                        aria-label="儲存"
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingBusinessRecordIndex(null);
+                          setDraftBusinessRecord({ contacts: 0, gatherings: 0, strangers: 0 });
+                        }}
+                        className="p-2 rounded-lg text-slate-400 md:hover:bg-slate-100 md:hover:text-slate-700"
+                        aria-label="取消"
+                      >
+                        <RefreshCw size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingBusinessRecordIndex(realIndex);
+                        setDraftBusinessRecord({
+                          contacts: Number(record.contacts) || 0,
+                          gatherings: Number(record.gatherings) || 0,
+                          strangers: Number(record.strangers) || 0,
+                        });
+                      }}
+                      className="p-2 rounded-lg text-slate-400 md:hover:bg-slate-100 md:hover:text-slate-700"
+                      aria-label="修正"
+                    >
+                      <Edit3 size={18} />
+                    </button>
+                  )}
                 </div>
               </div>
             )})}
@@ -1652,14 +1744,14 @@ export default function App() {
         <button
           type="button"
           onClick={cancelSettingsEdit}
-          className="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+          className="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-600 md:hover:bg-slate-50"
         >
           取消
         </button>
         <button
           type="button"
           onClick={onSave}
-          className="px-4 py-2 text-sm rounded-lg bg-slate-800 text-white hover:bg-slate-700"
+          className="px-4 py-2 text-sm rounded-lg bg-slate-800 text-white md:hover:bg-slate-700"
         >
           儲存
         </button>
@@ -1673,7 +1765,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => beginSettingsEdit(sectionKey)}
-            className="shrink-0 p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="shrink-0 p-2 rounded-lg text-slate-400 md:hover:bg-slate-100 md:hover:text-slate-700"
             aria-label="修正"
           >
             <Edit3 size={18} />
@@ -1688,38 +1780,40 @@ export default function App() {
           {sectionHeader('今日指引', 'guidance')}
           {settingsEditingSection === 'guidance' ? (
             <>
-              <ul className="space-y-2">
-                {draftGuidanceQuotes.map((q, i) => (
-                  <li key={`gq-edit-${i}`} className="flex gap-2">
-                    <textarea
-                      value={q}
-                      onChange={(e) => {
-                        const next = [...draftGuidanceQuotes];
-                        next[i] = e.target.value;
-                        setDraftGuidanceQuotes(next);
-                      }}
-                      className="flex-1 text-sm rounded-lg border border-slate-200 p-2 min-h-[52px] text-slate-800"
-                      rows={2}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setDraftGuidanceQuotes(draftGuidanceQuotes.filter((_, j) => j !== i))}
-                      className="shrink-0 text-slate-400 p-2 rounded-lg hover:bg-slate-50 hover:text-rose-500"
-                      aria-label="刪除"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </li>
-                ))}
-                <div ref={guidanceListEndRef} className="h-px w-full" aria-hidden />
-              </ul>
-              <button
-                type="button"
-                onClick={() => setDraftGuidanceQuotes([...draftGuidanceQuotes, ''])}
-                className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
-              >
-                <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
-              </button>
+              <div className="max-h-[52vh] overflow-y-auto pr-1">
+                <ul className="space-y-2">
+                  {draftGuidanceQuotes.map((q, i) => (
+                    <li key={`gq-edit-${i}`} className="flex gap-2">
+                      <textarea
+                        value={q}
+                        onChange={(e) => {
+                          const next = [...draftGuidanceQuotes];
+                          next[i] = e.target.value;
+                          setDraftGuidanceQuotes(next);
+                        }}
+                        className="flex-1 text-sm rounded-lg border border-slate-200 p-2 min-h-[52px] text-slate-800"
+                        rows={2}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDraftGuidanceQuotes(draftGuidanceQuotes.filter((_, j) => j !== i))}
+                        className="shrink-0 text-slate-400 p-2 rounded-lg md:hover:bg-slate-50 md:hover:text-rose-500"
+                        aria-label="刪除"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </li>
+                  ))}
+                  <div ref={guidanceListEndRef} className="h-px w-full" aria-hidden />
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setDraftGuidanceQuotes([...draftGuidanceQuotes, ''])}
+                  className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 md:hover:bg-slate-50"
+                >
+                  <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
+                </button>
+              </div>
               {editActions(saveGuidanceSection)}
             </>
           ) : (
@@ -1731,7 +1825,7 @@ export default function App() {
           {sectionHeader('學習紀錄', 'failures')}
           {settingsEditingSection === 'failures' ? (
             <>
-              <div className="space-y-3">
+              <div className="max-h-[52vh] overflow-y-auto pr-1 space-y-3">
                 {draftFailureTypes.map((ft, i) => {
                   const IconComp = ICON_MAP[ft.iconKey] || Mail;
                   return (
@@ -1740,7 +1834,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setIconPickerOpenId(iconPickerOpenId === ft.id ? null : ft.id)}
-                          className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
+                          className="rounded-lg border border-slate-200 p-2 text-slate-600 md:hover:bg-slate-50"
                           aria-label="選擇圖示"
                         >
                           <IconComp size={20} />
@@ -1756,7 +1850,7 @@ export default function App() {
                                 <button
                                   key={k}
                                   type="button"
-                                  className={`rounded-md p-2 hover:bg-slate-100 ${ft.iconKey === k ? 'ring-1 ring-indigo-400 bg-indigo-50' : ''}`}
+                                  className={`rounded-md p-2 md:hover:bg-slate-100 ${ft.iconKey === k ? 'ring-1 ring-indigo-400 bg-indigo-50' : ''}`}
                                   onClick={() => {
                                     const next = [...draftFailureTypes];
                                     next[i] = { ...ft, iconKey: k };
@@ -1799,7 +1893,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setDraftFailureTypes(draftFailureTypes.filter((_, j) => j !== i))}
-                            className="ml-auto text-slate-400 p-1.5 rounded-lg hover:bg-rose-50 hover:text-rose-500"
+                            className="ml-auto text-slate-400 p-1.5 rounded-lg md:hover:bg-rose-50 md:hover:text-rose-500"
                             aria-label="刪除"
                           >
                             <Trash2 size={16} />
@@ -1810,19 +1904,19 @@ export default function App() {
                   );
                 })}
                 <div ref={failuresListEndRef} className="h-px w-full" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraftFailureTypes([
+                      ...draftFailureTypes,
+                      { id: `ft-${Date.now()}`, label: '新項目', exp: 1, iconKey: 'Mail' },
+                    ])
+                  }
+                  className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 md:hover:bg-slate-50"
+                >
+                  <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setDraftFailureTypes([
-                    ...draftFailureTypes,
-                    { id: `ft-${Date.now()}`, label: '新項目', exp: 1, iconKey: 'Mail' },
-                  ])
-                }
-                className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
-              >
-                <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
-              </button>
               {editActions(saveFailuresSection)}
             </>
           ) : (
@@ -1834,7 +1928,8 @@ export default function App() {
           {sectionHeader('今日比賽', 'habits')}
           {settingsEditingSection === 'habits' ? (
             <>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="max-h-[52vh] overflow-y-auto pr-1">
+                <div className="grid grid-cols-3 gap-2">
                 {tempHabits.map((h, i) => (
                   <textarea
                     key={`hb-${i}`}
@@ -1849,6 +1944,7 @@ export default function App() {
                     placeholder=""
                   />
                 ))}
+                </div>
               </div>
               {editActions(saveHabitsSection)}
             </>
@@ -1862,24 +1958,26 @@ export default function App() {
           <p className="text-xs text-slate-500 mb-3">首頁三格按鈕的顯示名稱與達標數字。</p>
           {settingsEditingSection === 'stats' ? (
             <>
-              {(['contacts', 'gatherings', 'strangers']).map((key) => (
-                <div key={key} className="flex gap-2 items-center mb-2 last:mb-0">
-                  <input
-                    value={draftStatTargets[key].label}
-                    onChange={(e) => updateDraftStatTarget(key, 'label', e.target.value)}
-                    className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5"
-                    placeholder="項目名稱"
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    max={99999}
-                    value={draftStatTargets[key].target}
-                    onChange={(e) => updateDraftStatTarget(key, 'target', e.target.value)}
-                    className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-center"
-                  />
-                </div>
-              ))}
+              <div className="max-h-[52vh] overflow-y-auto pr-1">
+                {(['contacts', 'gatherings', 'strangers']).map((key) => (
+                  <div key={key} className="flex gap-2 items-center mb-2 last:mb-0">
+                    <input
+                      value={draftStatTargets[key].label}
+                      onChange={(e) => updateDraftStatTarget(key, 'label', e.target.value)}
+                      className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+                      placeholder=""
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      max={99999}
+                      value={draftStatTargets[key].target}
+                      onChange={(e) => updateDraftStatTarget(key, 'target', e.target.value)}
+                      className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-center"
+                    />
+                  </div>
+                ))}
+              </div>
               {editActions(saveStatsSection)}
             </>
           ) : (
@@ -1892,17 +1990,19 @@ export default function App() {
           <p className="text-xs text-slate-500 mb-2">本地時間到點後切換遊戲日並結算。</p>
           {settingsEditingSection === 'settlement' ? (
             <>
-              <input
-                type="time"
-                value={draftTimeInputValue}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  const [hh, mm] = v.split(':').map(Number);
-                  setDraftSettlementTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
-                }}
-                className="text-sm border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
-              />
+              <div className="max-h-[52vh] overflow-y-auto pr-1">
+                <input
+                  type="time"
+                  value={draftTimeInputValue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const [hh, mm] = v.split(':').map(Number);
+                    setDraftSettlementTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
+                  }}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
+                />
+              </div>
               {editActions(saveSettlementSection)}
             </>
           ) : (
@@ -2007,7 +2107,7 @@ export default function App() {
                     </div>
                   )}
 
-                  <button onClick={() => setShowLevelUpAnim(false)} className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md active:scale-95">
+                  <button onClick={() => setShowLevelUpAnim(false)} className="mt-4 w-full bg-indigo-600 md:hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md active:scale-95">
                       繼續努力！
                   </button>
               </div>
