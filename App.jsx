@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { 
   Trophy, TrendingUp, BookOpen, 
   Check, Edit3, Sparkles, Zap, Award, 
@@ -558,6 +558,22 @@ export default function App() {
   const [settlementTime, setSettlementTime] = useState(INITIAL_GAME.settlementTime);
   const [iconPickerOpenId, setIconPickerOpenId] = useState(null);
 
+  const [settingsEditingSection, setSettingsEditingSection] = useState(null);
+  const [draftGuidanceQuotes, setDraftGuidanceQuotes] = useState([]);
+  const [draftFailureTypes, setDraftFailureTypes] = useState([]);
+  const [draftStatTargets, setDraftStatTargets] = useState(() => ({
+    contacts: { ...INITIAL_GAME.statTargets.contacts },
+    gatherings: { ...INITIAL_GAME.statTargets.gatherings },
+    strangers: { ...INITIAL_GAME.statTargets.strangers },
+  }));
+  const [draftSettlementTime, setDraftSettlementTime] = useState(() => ({
+    ...INITIAL_GAME.settlementTime,
+  }));
+  const failuresListEndRef = useRef(null);
+  const guidanceListEndRef = useRef(null);
+  const prevDraftFailureCount = useRef(0);
+  const prevDraftGuidanceCount = useRef(0);
+
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
   const lastPlayDateRef = useRef(INITIAL_GAME.lastPlayDate);
@@ -724,6 +740,29 @@ export default function App() {
     document.addEventListener('mousedown', onDocDown);
     return () => document.removeEventListener('mousedown', onDocDown);
   }, [iconPickerOpenId]);
+
+  useEffect(() => {
+    if (activeTab !== 'settings') {
+      setSettingsEditingSection(null);
+      setIconPickerOpenId(null);
+    }
+  }, [activeTab]);
+
+  useLayoutEffect(() => {
+    if (settingsEditingSection !== 'failures') return;
+    if (draftFailureTypes.length > prevDraftFailureCount.current) {
+      failuresListEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+    prevDraftFailureCount.current = draftFailureTypes.length;
+  }, [draftFailureTypes.length, settingsEditingSection]);
+
+  useLayoutEffect(() => {
+    if (settingsEditingSection !== 'guidance') return;
+    if (draftGuidanceQuotes.length > prevDraftGuidanceCount.current) {
+      guidanceListEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+    prevDraftGuidanceCount.current = draftGuidanceQuotes.length;
+  }, [draftGuidanceQuotes.length, settingsEditingSection]);
 
   // --- Logic & Effects ---
 
@@ -1492,183 +1531,340 @@ export default function App() {
     );
   };
 
+  const beginSettingsEdit = (section) => {
+    if (settingsEditingSection && settingsEditingSection !== section) {
+      if (!window.confirm('目前有未儲存的編輯，切換區塊將放棄變更。確定嗎？')) return;
+    }
+    setIconPickerOpenId(null);
+    if (section === 'guidance') {
+      const next = [...guidanceQuotes];
+      prevDraftGuidanceCount.current = next.length;
+      setDraftGuidanceQuotes(next);
+    }
+    if (section === 'failures') {
+      const copy = failureTypes.map((ft) => ({ ...ft }));
+      prevDraftFailureCount.current = copy.length;
+      setDraftFailureTypes(copy);
+    }
+    if (section === 'stats') {
+      setDraftStatTargets({
+        contacts: { ...statTargets.contacts },
+        gatherings: { ...statTargets.gatherings },
+        strangers: { ...statTargets.strangers },
+      });
+    }
+    if (section === 'settlement') {
+      setDraftSettlementTime({ ...settlementTime });
+    }
+    setSettingsEditingSection(section);
+  };
+
+  const cancelSettingsEdit = () => {
+    setSettingsEditingSection(null);
+    setIconPickerOpenId(null);
+  };
+
+  const saveGuidanceSection = () => {
+    setGuidanceQuotes([...draftGuidanceQuotes]);
+    cancelSettingsEdit();
+  };
+
+  const saveFailuresSection = () => {
+    setFailureTypes(normalizeFailureTypesData(draftFailureTypes));
+    cancelSettingsEdit();
+  };
+
+  const saveStatsSection = () => {
+    if (!window.confirm('確定要儲存今日比賽數據設定嗎？')) return;
+    setStatTargets(normalizeStatTargets(draftStatTargets));
+    cancelSettingsEdit();
+  };
+
+  const saveSettlementSection = () => {
+    setSettlementTime(normalizeSettlementTime(draftSettlementTime));
+    cancelSettingsEdit();
+  };
+
+  const updateDraftStatTarget = (key, field, val) => {
+    setDraftStatTargets((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: field === 'target' ? Math.max(1, Math.min(99999, Number(val) || 1)) : String(val).slice(0, 32),
+      },
+    }));
+  };
+
   const renderSettings = () => {
-    const timeInputValue = `${String(settlementTime.hour).padStart(2, '0')}:${String(settlementTime.minute).padStart(2, '0')}`;
-    const updateStatTarget = (key, field, val) => {
-      setStatTargets((prev) => ({
-        ...prev,
-        [key]: {
-          ...prev[key],
-          [field]: field === 'target' ? Math.max(1, Math.min(99999, Number(val) || 1)) : String(val).slice(0, 32),
-        },
-      }));
-    };
+    const settlementDisplay = `${String(settlementTime.hour).padStart(2, '0')}:${String(settlementTime.minute).padStart(2, '0')}`;
+    const draftTimeInputValue = `${String(draftSettlementTime.hour).padStart(2, '0')}:${String(draftSettlementTime.minute).padStart(2, '0')}`;
+
+    const editActions = (onSave) => (
+      <div className="mt-4 flex gap-2 justify-end border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={cancelSettingsEdit}
+          className="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+        >
+          取消
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          className="px-4 py-2 text-sm rounded-lg bg-slate-800 text-white hover:bg-slate-700"
+        >
+          儲存
+        </button>
+      </div>
+    );
+
+    const sectionHeader = (title, sectionKey) => (
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+        {settingsEditingSection !== sectionKey && (
+          <button
+            type="button"
+            onClick={() => beginSettingsEdit(sectionKey)}
+            className="shrink-0 p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            aria-label="修正"
+          >
+            <Edit3 size={18} />
+          </button>
+        )}
+      </div>
+    );
+
     return (
       <div className="space-y-5 animate-fadeIn pb-8">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-800 mb-3">今日指引</h2>
-          <ul className="space-y-2 max-h-52 overflow-y-auto">
-            {guidanceQuotes.map((q, i) => (
-              <li key={`gq-${i}`} className="flex gap-2">
-                <textarea
-                  value={q}
-                  onChange={(e) => {
-                    const next = [...guidanceQuotes];
-                    next[i] = e.target.value;
-                    setGuidanceQuotes(next);
-                  }}
-                  className="flex-1 text-sm rounded-lg border border-slate-200 p-2 min-h-[52px] text-slate-800"
-                  rows={2}
-                />
-                <button
-                  type="button"
-                  onClick={() => setGuidanceQuotes(guidanceQuotes.filter((_, j) => j !== i))}
-                  className="shrink-0 text-slate-400 p-2 rounded-lg hover:bg-slate-50 hover:text-rose-500"
-                  aria-label="刪除"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => setGuidanceQuotes([...guidanceQuotes, ''])}
-            className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
-          >
-            <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
-          </button>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-800 mb-3">學習紀錄</h2>
-          <div className="space-y-3 max-h-72 overflow-y-auto">
-            {failureTypes.map((ft, i) => {
-              const IconComp = ICON_MAP[ft.iconKey] || Mail;
-              return (
-                <div key={ft.id} className="flex gap-2 items-start border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                  <div className="relative shrink-0" data-settings-icon-picker>
+          {sectionHeader('今日指引', 'guidance')}
+          {settingsEditingSection === 'guidance' ? (
+            <>
+              <ul className="space-y-2">
+                {draftGuidanceQuotes.map((q, i) => (
+                  <li key={`gq-edit-${i}`} className="flex gap-2">
+                    <textarea
+                      value={q}
+                      onChange={(e) => {
+                        const next = [...draftGuidanceQuotes];
+                        next[i] = e.target.value;
+                        setDraftGuidanceQuotes(next);
+                      }}
+                      className="flex-1 text-sm rounded-lg border border-slate-200 p-2 min-h-[52px] text-slate-800"
+                      rows={2}
+                    />
                     <button
                       type="button"
-                      onClick={() => setIconPickerOpenId(iconPickerOpenId === ft.id ? null : ft.id)}
-                      className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
-                      aria-label="選擇圖示"
+                      onClick={() => setDraftGuidanceQuotes(draftGuidanceQuotes.filter((_, j) => j !== i))}
+                      className="shrink-0 text-slate-400 p-2 rounded-lg hover:bg-slate-50 hover:text-rose-500"
+                      aria-label="刪除"
                     >
-                      <IconComp size={20} />
+                      <Trash2 size={18} />
                     </button>
-                    {iconPickerOpenId === ft.id && (
-                      <div
-                        className="absolute z-[60] left-0 top-full mt-1 w-[220px] rounded-xl border border-slate-200 bg-white p-2 shadow-lg grid grid-cols-5 gap-1"
-                        onMouseDown={(e) => e.stopPropagation()}
-                      >
-                        {FAILURE_ICON_KEYS.map((k) => {
-                          const Ic = ICON_MAP[k];
-                          return (
-                            <button
-                              key={k}
-                              type="button"
-                              className={`rounded-md p-2 hover:bg-slate-100 ${ft.iconKey === k ? 'ring-1 ring-indigo-400 bg-indigo-50' : ''}`}
-                              onClick={() => {
-                                const next = [...failureTypes];
-                                next[i] = { ...ft, iconKey: k };
-                                setFailureTypes(next);
-                                setIconPickerOpenId(null);
-                              }}
-                            >
-                              <Ic size={18} className="mx-auto text-slate-700" />
-                            </button>
-                          );
-                        })}
+                  </li>
+                ))}
+                <div ref={guidanceListEndRef} className="h-px w-full" aria-hidden />
+              </ul>
+              <button
+                type="button"
+                onClick={() => setDraftGuidanceQuotes([...draftGuidanceQuotes, ''])}
+                className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
+              </button>
+              {editActions(saveGuidanceSection)}
+            </>
+          ) : (
+            <ul className="space-y-2">
+              {guidanceQuotes.length === 0 ? (
+                <p className="text-sm text-slate-400">尚無內容，請按鉛筆圖示編輯。</p>
+              ) : (
+                guidanceQuotes.map((q, i) => (
+                  <li key={`gqv-${i}`} className="text-sm text-slate-700 border-b border-slate-100 pb-2 last:border-0 whitespace-pre-wrap">
+                    {q || '（空白）'}
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          {sectionHeader('學習紀錄', 'failures')}
+          {settingsEditingSection === 'failures' ? (
+            <>
+              <div className="space-y-3">
+                {draftFailureTypes.map((ft, i) => {
+                  const IconComp = ICON_MAP[ft.iconKey] || Mail;
+                  return (
+                    <div key={ft.id} className="flex gap-2 items-start border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                      <div className="relative shrink-0" data-settings-icon-picker>
+                        <button
+                          type="button"
+                          onClick={() => setIconPickerOpenId(iconPickerOpenId === ft.id ? null : ft.id)}
+                          className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
+                          aria-label="選擇圖示"
+                        >
+                          <IconComp size={20} />
+                        </button>
+                        {iconPickerOpenId === ft.id && (
+                          <div
+                            className="absolute z-[60] left-0 top-full mt-1 w-[220px] rounded-xl border border-slate-200 bg-white p-2 shadow-lg grid grid-cols-5 gap-1"
+                            onMouseDown={(e) => e.stopPropagation()}
+                          >
+                            {FAILURE_ICON_KEYS.map((k) => {
+                              const Ic = ICON_MAP[k];
+                              return (
+                                <button
+                                  key={k}
+                                  type="button"
+                                  className={`rounded-md p-2 hover:bg-slate-100 ${ft.iconKey === k ? 'ring-1 ring-indigo-400 bg-indigo-50' : ''}`}
+                                  onClick={() => {
+                                    const next = [...draftFailureTypes];
+                                    next[i] = { ...ft, iconKey: k };
+                                    setDraftFailureTypes(next);
+                                    setIconPickerOpenId(null);
+                                  }}
+                                >
+                                  <Ic size={18} className="mx-auto text-slate-700" />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <input
-                      value={ft.label}
-                      onChange={(e) => {
-                        const next = [...failureTypes];
-                        next[i] = { ...ft, label: e.target.value };
-                        setFailureTypes(next);
-                      }}
-                      className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800"
-                      placeholder="名稱"
-                    />
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">EXP</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={99999}
-                        value={ft.exp}
-                        onChange={(e) => {
-                          const next = [...failureTypes];
-                          next[i] = { ...ft, exp: Math.max(0, Number(e.target.value) || 0) };
-                          setFailureTypes(next);
-                        }}
-                        className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1 text-center"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setFailureTypes(failureTypes.filter((_, j) => j !== i))}
-                        className="ml-auto text-slate-400 p-1.5 rounded-lg hover:bg-rose-50 hover:text-rose-500"
-                        aria-label="刪除"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <input
+                          value={ft.label}
+                          onChange={(e) => {
+                            const next = [...draftFailureTypes];
+                            next[i] = { ...ft, label: e.target.value };
+                            setDraftFailureTypes(next);
+                          }}
+                          className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800"
+                          placeholder="名稱"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500">EXP</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={99999}
+                            value={ft.exp}
+                            onChange={(e) => {
+                              const next = [...draftFailureTypes];
+                              next[i] = { ...ft, exp: Math.max(0, Number(e.target.value) || 0) };
+                              setDraftFailureTypes(next);
+                            }}
+                            className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1 text-center"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setDraftFailureTypes(draftFailureTypes.filter((_, j) => j !== i))}
+                            className="ml-auto text-slate-400 p-1.5 rounded-lg hover:bg-rose-50 hover:text-rose-500"
+                            aria-label="刪除"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            onClick={() =>
-              setFailureTypes([...failureTypes, { id: `ft-${Date.now()}`, label: '新項目', exp: 1, iconKey: 'Mail' }])
-            }
-            className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
-          >
-            <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
-          </button>
+                  );
+                })}
+                <div ref={failuresListEndRef} className="h-px w-full" aria-hidden />
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setDraftFailureTypes([
+                    ...draftFailureTypes,
+                    { id: `ft-${Date.now()}`, label: '新項目', exp: 1, iconKey: 'Mail' },
+                  ])
+                }
+                className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
+              </button>
+              {editActions(saveFailuresSection)}
+            </>
+          ) : (
+            <ul className="space-y-2">
+              {failureTypes.length === 0 ? (
+                <p className="text-sm text-slate-400">尚無項目，請按鉛筆圖示編輯。</p>
+              ) : (
+                failureTypes.map((ft) => {
+                  const IconComp = ICON_MAP[ft.iconKey] || Mail;
+                  return (
+                    <li key={ft.id} className="flex items-center gap-2 text-sm text-slate-700 border-b border-slate-100 pb-2 last:border-0">
+                      <IconComp size={18} className="text-slate-500 shrink-0" />
+                      <span className="flex-1">{ft.label}</span>
+                      <span className="text-slate-400 tabular-nums">+{ft.exp}</span>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          )}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-800 mb-3">今日比賽數據</h2>
+          {sectionHeader('今日比賽數據', 'stats')}
           <p className="text-xs text-slate-500 mb-3">首頁三格按鈕的顯示名稱與達標數字。</p>
-          {(['contacts', 'gatherings', 'strangers']).map((key) => (
-            <div key={key} className="flex gap-2 items-center mb-2 last:mb-0">
-              <input
-                value={statTargets[key].label}
-                onChange={(e) => updateStatTarget(key, 'label', e.target.value)}
-                className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5"
-                placeholder="項目名稱"
-              />
-              <input
-                type="number"
-                min={1}
-                max={99999}
-                value={statTargets[key].target}
-                onChange={(e) => updateStatTarget(key, 'target', e.target.value)}
-                className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-center"
-              />
-            </div>
-          ))}
+          {settingsEditingSection === 'stats' ? (
+            <>
+              {(['contacts', 'gatherings', 'strangers']).map((key) => (
+                <div key={key} className="flex gap-2 items-center mb-2 last:mb-0">
+                  <input
+                    value={draftStatTargets[key].label}
+                    onChange={(e) => updateDraftStatTarget(key, 'label', e.target.value)}
+                    className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+                    placeholder="項目名稱"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={99999}
+                    value={draftStatTargets[key].target}
+                    onChange={(e) => updateDraftStatTarget(key, 'target', e.target.value)}
+                    className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-center"
+                  />
+                </div>
+              ))}
+              {editActions(saveStatsSection)}
+            </>
+          ) : (
+            <ul className="space-y-2 text-sm text-slate-700">
+              {(['contacts', 'gatherings', 'strangers']).map((key) => (
+                <li key={key} className="flex justify-between border-b border-slate-100 pb-2 last:border-0">
+                  <span>{statTargets[key].label}</span>
+                  <span className="text-slate-500 tabular-nums">目標 {statTargets[key].target}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-800 mb-2">每日結算時間</h2>
+          {sectionHeader('每日結算時間', 'settlement')}
           <p className="text-xs text-slate-500 mb-2">本地時間到點後切換遊戲日並結算。</p>
-          <input
-            type="time"
-            value={timeInputValue}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) return;
-              const [hh, mm] = v.split(':').map(Number);
-              setSettlementTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
-            }}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
-          />
+          {settingsEditingSection === 'settlement' ? (
+            <>
+              <input
+                type="time"
+                value={draftTimeInputValue}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  const [hh, mm] = v.split(':').map(Number);
+                  setDraftSettlementTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
+                }}
+                className="text-sm border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
+              />
+              {editActions(saveSettlementSection)}
+            </>
+          ) : (
+            <p className="text-lg font-medium text-slate-800 tabular-nums">{settlementDisplay}</p>
+          )}
         </div>
       </div>
     );
