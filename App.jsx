@@ -773,6 +773,7 @@ function AppInner() {
   const [showCelebrate, setShowCelebrate] = useState(false);
   const [recentExpGain, setRecentExpGain] = useState(0);
   const [failureQuote, setFailureQuote] = useState("");
+  const [pendingCelebrate, setPendingCelebrate] = useState(null);
   const [editingFailureId, setEditingFailureId] = useState(null);
   const [draftFailureDateTime, setDraftFailureDateTime] = useState('');
 
@@ -1044,6 +1045,20 @@ function AppInner() {
   }, [level, currentTitle, prevLevel]);
 
   useEffect(() => {
+    if (!pendingCelebrate) return;
+    if (showLevelUpAnim) return;
+    if (showCelebrate) return;
+    setFailureQuote(pendingCelebrate.quote);
+    setRecentExpGain(pendingCelebrate.exp);
+    setShowCelebrate(true);
+    const t = setTimeout(() => {
+      setShowCelebrate(false);
+      setPendingCelebrate(null);
+    }, 2400);
+    return () => clearTimeout(t);
+  }, [pendingCelebrate, showLevelUpAnim, showCelebrate]);
+
+  useEffect(() => {
     if (bingoStats.completedLines > prevLines) {
       const diff = bingoStats.completedLines - prevLines;
       addFloatingText(window.innerWidth / 2, window.innerHeight * 0.35, `連線！ +${diff * 3} EXP`, 'line');
@@ -1270,12 +1285,9 @@ function AppInner() {
     ]);
     
     const randomQuote = FAILURE_QUOTES[Math.floor(Math.random() * FAILURE_QUOTES.length)];
-    setFailureQuote(randomQuote);
     
     setBaseExp(prev => prev + typeObj.exp);
-    setRecentExpGain(typeObj.exp);
-    setShowCelebrate(true);
-    setTimeout(() => setShowCelebrate(false), 3000);
+    setPendingCelebrate({ quote: randomQuote, exp: typeObj.exp });
   };
 
   const removeFailure = (id) => {
@@ -1621,21 +1633,19 @@ function AppInner() {
         </div>
         
         {showCelebrate && (
-          <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/55 backdrop-blur-sm p-6">
-            <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/20 bg-white shadow-2xl">
-              <div
-                className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-amber-200/70 blur-3xl"
-                aria-hidden
-              />
-              <div
-                className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-indigo-200/50 blur-3xl"
-                aria-hidden
-              />
-              <div className="relative p-6 text-center">
-                <Sparkles size={44} className="mx-auto text-amber-500 mb-3 anim-celebrate-pop" />
-                <h3 className="text-lg font-black text-slate-900 leading-relaxed">「{failureQuote}」</h3>
-                <p className="font-black text-2xl text-amber-500 mt-3 tabular-nums">+{recentExpGain} EXP</p>
-              </div>
+          <div className="fixed inset-0 z-[130] flex items-center justify-center bg-indigo-900/85 backdrop-blur-md">
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none">
+              <div className="w-[150vw] h-[150vw] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.10)_350deg,transparent_360deg)] anim-spin-slow opacity-60 rounded-full"></div>
+              <div className="w-[100vw] h-[100vw] border-[4vw] border-dashed border-white/10 rounded-full anim-spin-slow absolute opacity-40"></div>
+            </div>
+            <div className="relative z-10 w-11/12 max-w-md text-center px-6">
+              <Sparkles size={54} className="mx-auto text-amber-400 drop-shadow-[0_0_30px_rgba(251,191,36,0.6)] anim-celebrate-pop" />
+              <p className="mt-5 text-2xl font-black text-white leading-relaxed drop-shadow-lg">
+                「{failureQuote}」
+              </p>
+              <p className="mt-5 text-3xl font-black text-amber-300 tabular-nums drop-shadow-[0_0_18px_rgba(251,191,36,0.45)]">
+                +{recentExpGain} EXP
+              </p>
             </div>
           </div>
         )}
@@ -1781,14 +1791,16 @@ function AppInner() {
             className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-sky-200/40 blur-3xl"
             aria-hidden
           />
+          <div className="absolute top-3 right-3 bg-orange-50 text-orange-700 px-3 py-1.5 rounded-xl font-bold flex flex-col items-end border border-orange-100">
+            <span className="text-[10px] text-orange-400">目前連勝</span>
+            <span className="flex items-center gap-1 text-sm">
+              <Trophy size={14} className="text-orange-500" /> {streak} 勝
+            </span>
+          </div>
           <p className="relative z-10 text-xs text-slate-500 mb-2">本季目前戰績</p>
           <p className="relative z-10 text-2xl font-bold text-slate-800 tabular-nums">
             {seasonRecord.wins} 勝 <span className="text-slate-300 font-normal">·</span> {seasonRecord.losses} 負
           </p>
-          <div className="relative z-10 mt-2 flex items-center justify-between">
-            <p className="text-xs text-slate-500 font-bold">目前連勝</p>
-            <p className="text-sm font-black text-slate-800 tabular-nums">{streak} 勝</p>
-          </div>
           <div className="relative z-10 mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
               <p className="text-[10px] text-slate-500 font-bold mb-0.5">累積大三元</p>
