@@ -1080,6 +1080,15 @@ function AppInner() {
     };
   }, [businessRecords, todayStats]);
 
+  const heatTier = (n) => {
+    const x = Number(n) || 0;
+    if (x >= 21) return 4;
+    if (x >= 14) return 3;
+    if (x >= 7) return 2;
+    if (x >= 3) return 1;
+    return 0;
+  };
+
   const getDayMilestones = (stats) => {
     const c = Number(stats.contacts) >= statTargets.contacts.target;
     const g = Number(stats.gatherings) >= statTargets.gatherings.target;
@@ -1341,6 +1350,8 @@ function AppInner() {
 
   const renderHome = () => {
     const cardStyle = getStyleByTitle(currentTitle);
+    const tdHeat = heatTier(tripleDoubleStreak);
+    const winHeat = heatTier(streak);
 
     return (
       <div className="space-y-5 animate-fadeIn pb-6 relative">
@@ -1404,11 +1415,8 @@ function AppInner() {
             aria-hidden
           />
           <div className="relative z-10 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 border border-indigo-100">
-                <BookOpen size={18} className="text-indigo-600" />
-              </div>
-              <p className="text-sm font-black tracking-wide text-gray-800">今日指引</p>
+            <div className="min-w-0">
+              <p className="text-xl font-bold text-gray-800">今日指引</p>
             </div>
             {guidanceRemainingToday > 0 && !guidanceDrawsToday.length && !guidanceDrawing && (
               <span className="shrink-0 text-[10px] font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-100">
@@ -1457,11 +1465,18 @@ function AppInner() {
         </div>
 
         {/* --- 今日比賽數據區塊 --- */}
-        <div className="relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
+        <div className={`relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3 ${tdHeat ? `heat-card heat-${tdHeat}` : ''}`}>
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.35] bg-[linear-gradient(rgba(99,102,241,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.06)_1px,transparent_1px)] bg-[length:14px_14px]"
             aria-hidden
           />
+          {tdHeat > 0 && (
+            <>
+              <div className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-orange-200/70 blur-3xl" aria-hidden />
+              <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-amber-200/55 blur-3xl" aria-hidden />
+              <div className="pointer-events-none absolute inset-0 heat-flame" aria-hidden />
+            </>
+          )}
            <div className="relative z-10 flex justify-between items-end mb-1">
               <div>
                 <h2 className="text-xl font-bold text-gray-800">今日比賽數據</h2>
@@ -1519,11 +1534,18 @@ function AppInner() {
         </div>
 
         {/* 整合至首頁的 今日比賽 */}
-        <div className="relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
+        <div className={`relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3 ${winHeat ? `heat-card heat-${winHeat}` : ''}`}>
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.12] bg-[radial-gradient(circle_at_1px_1px,rgba(99,102,241,0.35)_1px,transparent_0)] bg-[length:10px_10px]"
             aria-hidden
           />
+          {winHeat > 0 && (
+            <>
+              <div className="pointer-events-none absolute -top-16 -left-10 h-48 w-48 rounded-full bg-rose-200/60 blur-3xl" aria-hidden />
+              <div className="pointer-events-none absolute -bottom-10 -right-10 h-44 w-44 rounded-full bg-amber-200/50 blur-3xl" aria-hidden />
+              <div className="pointer-events-none absolute inset-0 heat-flame" aria-hidden />
+            </>
+          )}
           <div className="relative z-10 flex justify-between items-start">
             <div>
               <h2 className="text-xl font-bold text-gray-800">今日比賽</h2>
@@ -1599,10 +1621,22 @@ function AppInner() {
         </div>
         
         {showCelebrate && (
-          <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-20 flex flex-col items-center justify-center animate-fadeIn p-6">
-            <Sparkles size={40} className="text-amber-500 mb-3" />
-            <h3 className="text-lg font-bold text-indigo-800 mb-2 leading-relaxed">「{failureQuote}」</h3>
-            <p className="font-black text-2xl text-amber-500 mt-1">+{recentExpGain} EXP</p>
+          <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/55 backdrop-blur-sm p-6">
+            <div className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/20 bg-white shadow-2xl">
+              <div
+                className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-amber-200/70 blur-3xl"
+                aria-hidden
+              />
+              <div
+                className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-indigo-200/50 blur-3xl"
+                aria-hidden
+              />
+              <div className="relative p-6 text-center">
+                <Sparkles size={44} className="mx-auto text-amber-500 mb-3 anim-celebrate-pop" />
+                <h3 className="text-lg font-black text-slate-900 leading-relaxed">「{failureQuote}」</h3>
+                <p className="font-black text-2xl text-amber-500 mt-3 tabular-nums">+{recentExpGain} EXP</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1751,6 +1785,10 @@ function AppInner() {
           <p className="relative z-10 text-2xl font-bold text-slate-800 tabular-nums">
             {seasonRecord.wins} 勝 <span className="text-slate-300 font-normal">·</span> {seasonRecord.losses} 負
           </p>
+          <div className="relative z-10 mt-2 flex items-center justify-between">
+            <p className="text-xs text-slate-500 font-bold">目前連勝</p>
+            <p className="text-sm font-black text-slate-800 tabular-nums">{streak} 勝</p>
+          </div>
           <div className="relative z-10 mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
               <p className="text-[10px] text-slate-500 font-bold mb-0.5">累積大三元</p>
@@ -2402,6 +2440,7 @@ function AppInner() {
                         setShowLevelUpAnim(false);
                         setActiveTab('home');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
+                        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 50);
                       }}
                       className="mt-4 w-full bg-amber-500 md:hover:bg-amber-600 text-white font-black py-3 rounded-xl transition-colors shadow-md active:scale-95"
                     >
@@ -2529,6 +2568,36 @@ function AppInner() {
         }
         .anim-guidance-shimmer {
           animation: guidanceShimmer 1s ease-in-out infinite;
+        }
+
+        @keyframes celebratePop {
+          0% { transform: scale(0.92); opacity: 0.2; }
+          60% { transform: scale(1.05); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .anim-celebrate-pop {
+          animation: celebratePop 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+
+        .heat-card {
+          border-color: rgba(251, 191, 36, 0.35);
+        }
+        .heat-card.heat-1 { box-shadow: 0 0 0 1px rgba(251,191,36,0.18), 0 10px 30px rgba(245,158,11,0.10); }
+        .heat-card.heat-2 { box-shadow: 0 0 0 1px rgba(251,191,36,0.25), 0 14px 34px rgba(245,158,11,0.14); }
+        .heat-card.heat-3 { box-shadow: 0 0 0 1px rgba(251,191,36,0.30), 0 18px 38px rgba(244,63,94,0.16); }
+        .heat-card.heat-4 { box-shadow: 0 0 0 1px rgba(251,191,36,0.35), 0 22px 44px rgba(244,63,94,0.18); }
+
+        @keyframes flameFlicker {
+          0%, 100% { opacity: 0.45; transform: translateY(0) scale(1); filter: blur(12px); }
+          50% { opacity: 0.7; transform: translateY(-2px) scale(1.02); filter: blur(14px); }
+        }
+        .heat-flame {
+          background:
+            radial-gradient(ellipse at 50% 120%, rgba(251, 191, 36, 0.55), transparent 55%),
+            radial-gradient(ellipse at 20% 110%, rgba(244, 63, 94, 0.40), transparent 58%),
+            radial-gradient(ellipse at 80% 110%, rgba(249, 115, 22, 0.40), transparent 58%);
+          animation: flameFlicker 1.05s ease-in-out infinite;
+          mix-blend-mode: multiply;
         }
       `}} />
     </div>
