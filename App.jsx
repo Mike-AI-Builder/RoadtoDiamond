@@ -856,6 +856,8 @@ function AppInner() {
 
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
+  const historyPressTimer = useRef(null);
+  const historyIsLongPress = useRef(false);
   const lastPlayDateRef = useRef(INITIAL_GAME.lastPlayDate);
   const settlementTimeRef = useRef(INITIAL_GAME.settlementTime);
   const gridStateRef = useRef(INITIAL_GAME.gridState);
@@ -1235,6 +1237,20 @@ function AppInner() {
 
   const handlePointerUp = () => {
     if (pressTimer.current) clearTimeout(pressTimer.current);
+  };
+
+  const handleHistoryPointerDown = (field) => {
+    historyIsLongPress.current = false;
+    if (historyPressTimer.current) clearTimeout(historyPressTimer.current);
+    historyPressTimer.current = setTimeout(() => {
+      historyIsLongPress.current = true;
+      setDraftBusinessRecord((p) => ({ ...p, [field]: 0 }));
+      if (navigator.vibrate) navigator.vibrate(40);
+    }, 600);
+  };
+
+  const handleHistoryPointerUp = () => {
+    if (historyPressTimer.current) clearTimeout(historyPressTimer.current);
   };
 
   const handleStatClick = (type, e) => {
@@ -1704,7 +1720,7 @@ function AppInner() {
         className="pointer-events-none absolute inset-0 -z-10 rounded-[2rem] bg-[radial-gradient(ellipse_at_40%_0%,rgba(251,191,36,0.14),transparent_55%)]"
         aria-hidden
       />
-      <div className="relative overflow-hidden bg-white rounded-3xl p-6 text-center border border-slate-200 shadow-sm">
+      <div className="relative overflow-hidden bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
         <div
           className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-indigo-100/80 blur-3xl"
           aria-hidden
@@ -1717,14 +1733,19 @@ function AppInner() {
           className="pointer-events-none absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(148,163,184,0.18)_1px,transparent_1px)] bg-[length:100%_10px]"
           aria-hidden
         />
-        <h2 className="relative z-10 text-2xl font-bold text-gray-800 mb-1">學習紀錄</h2>
-        <p className="relative z-10 text-gray-600 text-sm mb-3 leading-relaxed px-1">
-          失敗為成功之母，每次失敗都是一次學習，把它們記錄下來，賺取經驗值！
-        </p>
-        <div className="relative z-10 flex justify-center mb-4">
-           <span className="bg-white text-indigo-700 font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-1.5 shadow-sm border border-indigo-100">
-             <Sparkles size={16} className="text-amber-500" /> 累計紀錄：{failures.length} 次
-           </span>
+        <div className="relative z-10 flex items-start justify-between gap-3 mb-4">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-gray-800">學習紀錄</h2>
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+              點擊類型立即記錄並獲得 EXP
+            </p>
+          </div>
+          <div className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-xl font-bold flex flex-col items-end border border-orange-100">
+            <span className="text-[10px] text-orange-400">累計學習次數</span>
+            <span className="flex items-center gap-1 text-sm">
+              <Sparkles size={14} className="text-amber-500" /> {failures.length} 次
+            </span>
+          </div>
         </div>
         
         {/* 金句動畫已移到全域 overlay，避免在手機上被匡格影響定位 */}
@@ -1997,36 +2018,72 @@ function AppInner() {
                 <div className="flex items-center gap-2 text-sm">
                   <span className="flex items-center gap-1 text-emerald-600">
                     <MessageCircle size={14}/> 
-                    <input 
-                      type="number"
-                      min="0"
-                      value={isEditing ? draftBusinessRecord.contacts : record.contacts}
-                      disabled={!isEditing}
-                      onChange={e => setDraftBusinessRecord((p) => ({ ...p, contacts: Number(e.target.value) || 0 }))}
-                      className={`w-10 h-7 border rounded text-center outline-none font-bold tabular-nums ${isEditing ? 'bg-emerald-50 border-emerald-100 focus:ring-1 focus:ring-emerald-400' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
-                    />
+                    {isEditing ? (
+                      <button
+                        type="button"
+                        onPointerDown={() => handleHistoryPointerDown('contacts')}
+                        onPointerUp={handleHistoryPointerUp}
+                        onPointerLeave={handleHistoryPointerUp}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => {
+                          if (historyIsLongPress.current) return;
+                          setDraftBusinessRecord((p) => ({ ...p, contacts: (Number(p.contacts) || 0) + 1 }));
+                        }}
+                        className="w-10 h-7 bg-emerald-50 border border-emerald-100 rounded text-center outline-none font-black tabular-nums flex items-center justify-center md:hover:bg-emerald-100 active:scale-95 transition-all"
+                      >
+                        {draftBusinessRecord.contacts}
+                      </button>
+                    ) : (
+                      <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
+                        {record.contacts}
+                      </span>
+                    )}
                   </span>
                   <span className="flex items-center gap-1 text-blue-600">
                     <Users size={14}/> 
-                    <input 
-                      type="number"
-                      min="0"
-                      value={isEditing ? draftBusinessRecord.gatherings : record.gatherings}
-                      disabled={!isEditing}
-                      onChange={e => setDraftBusinessRecord((p) => ({ ...p, gatherings: Number(e.target.value) || 0 }))}
-                      className={`w-10 h-7 border rounded text-center outline-none font-bold tabular-nums ${isEditing ? 'bg-blue-50 border-blue-100 focus:ring-1 focus:ring-blue-400' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
-                    />
+                    {isEditing ? (
+                      <button
+                        type="button"
+                        onPointerDown={() => handleHistoryPointerDown('gatherings')}
+                        onPointerUp={handleHistoryPointerUp}
+                        onPointerLeave={handleHistoryPointerUp}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => {
+                          if (historyIsLongPress.current) return;
+                          setDraftBusinessRecord((p) => ({ ...p, gatherings: (Number(p.gatherings) || 0) + 1 }));
+                        }}
+                        className="w-10 h-7 bg-blue-50 border border-blue-100 rounded text-center outline-none font-black tabular-nums flex items-center justify-center md:hover:bg-blue-100 active:scale-95 transition-all"
+                      >
+                        {draftBusinessRecord.gatherings}
+                      </button>
+                    ) : (
+                      <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
+                        {record.gatherings}
+                      </span>
+                    )}
                   </span>
                   <span className="flex items-center gap-1 text-purple-600">
                     <TrendingUp size={14}/> 
-                    <input 
-                      type="number"
-                      min="0"
-                      value={isEditing ? draftBusinessRecord.strangers : record.strangers}
-                      disabled={!isEditing}
-                      onChange={e => setDraftBusinessRecord((p) => ({ ...p, strangers: Number(e.target.value) || 0 }))}
-                      className={`w-10 h-7 border rounded text-center outline-none font-bold tabular-nums ${isEditing ? 'bg-purple-50 border-purple-100 focus:ring-1 focus:ring-purple-400' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
-                    />
+                    {isEditing ? (
+                      <button
+                        type="button"
+                        onPointerDown={() => handleHistoryPointerDown('strangers')}
+                        onPointerUp={handleHistoryPointerUp}
+                        onPointerLeave={handleHistoryPointerUp}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => {
+                          if (historyIsLongPress.current) return;
+                          setDraftBusinessRecord((p) => ({ ...p, strangers: (Number(p.strangers) || 0) + 1 }));
+                        }}
+                        className="w-10 h-7 bg-purple-50 border border-purple-100 rounded text-center outline-none font-black tabular-nums flex items-center justify-center md:hover:bg-purple-100 active:scale-95 transition-all"
+                      >
+                        {draftBusinessRecord.strangers}
+                      </button>
+                    ) : (
+                      <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
+                        {record.strangers}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="ml-2 flex items-center gap-1">
