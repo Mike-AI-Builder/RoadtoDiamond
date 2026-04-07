@@ -555,7 +555,42 @@ function loadPersistedGameState() {
 
 const INITIAL_GAME = loadPersistedGameState() ?? createFreshGameState();
 
-export default function App() {
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(err) {
+    // 避免整頁白屏：在不支援或出錯時提供可見 fallback
+    console.error(err);
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans text-slate-800 p-6">
+        <div className="max-w-md mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 p-5">
+          <p className="text-sm font-black text-slate-800 mb-2">頁面載入失敗</p>
+          <p className="text-xs text-slate-500 mb-4">請重新整理頁面；若仍無法顯示，建議用無痕模式開啟。</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="w-full py-3 rounded-2xl bg-slate-800 text-white font-black md:hover:bg-slate-700 active:scale-[0.99] transition-all"
+          >
+            重新整理
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
+function AppInner() {
   const [activeTab, setActiveTab] = useState('home');
   
   // --- Game State ---
@@ -2234,5 +2269,13 @@ export default function App() {
         }
       `}} />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
