@@ -1403,10 +1403,17 @@ function AppInner() {
     return exp;
   };
 
-  const updateHistory = (index, field, value) => {
+  /** 一次寫入三欄，避免連續 setState 讀到過期 state 導致只存到最後一欄 */
+  const commitHistoryEdit = (index, draft) => {
     const oldRecord = businessRecords[index];
-    const newRecord = { ...oldRecord, [field]: Number(value) || 0 };
-    
+    if (!oldRecord) return;
+    const newRecord = {
+      ...oldRecord,
+      contacts: Number(draft.contacts) || 0,
+      gatherings: Number(draft.gatherings) || 0,
+      strangers: Number(draft.strangers) || 0,
+    };
+
     const oldExp = calculateDayExp(oldRecord);
     const newExp = calculateDayExp(newRecord);
     const expDiff = newExp - oldExp;
@@ -1416,8 +1423,9 @@ function AppInner() {
     setBusinessRecords(newRecords);
 
     if (expDiff !== 0) {
-      setBaseExp(prev => prev + expDiff);
+      setBaseExp((prev) => prev + expDiff);
     }
+    setEditingBusinessRecordIndex(null);
   };
 
   const openConfirm = ({ title = '確認', message, confirmText = '確定', cancelText = '取消', onConfirm }) => {
@@ -1880,8 +1888,6 @@ function AppInner() {
   );
 
   const renderStats = () => {
-    const currentGameDayKey = getGameDayKey(new Date(), settlementTime);
-    const showCurrentGameDayRow = !businessRecords.some((r) => r.date === currentGameDayKey);
     return (
       <div className="relative space-y-6 animate-fadeIn pb-8">
         <div
@@ -1983,32 +1989,6 @@ function AppInner() {
             <BarChart2 size={18} className="text-blue-600" /> 歷史比賽數據
           </h3>
           <div className="relative z-10 space-y-2">
-            {showCurrentGameDayRow && (
-              <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex justify-between items-center md:hover:bg-blue-50/50 transition-colors">
-                <span className="text-sm font-bold text-gray-500 w-24">{currentGameDayKey}</span>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="flex items-center gap-1 text-emerald-600">
-                    <MessageCircle size={14} />
-                    <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
-                      {Number(todayStats.contacts) || 0}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-blue-600">
-                    <Users size={14} />
-                    <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
-                      {Number(todayStats.gatherings) || 0}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-purple-600">
-                    <TrendingUp size={14} />
-                    <span className="w-10 h-7 bg-slate-50 border border-slate-200 rounded text-center font-bold tabular-nums flex items-center justify-center text-slate-700">
-                      {Number(todayStats.strangers) || 0}
-                    </span>
-                  </span>
-                </div>
-                <div className="ml-2 w-[44px]" aria-hidden />
-              </div>
-            )}
             {[...businessRecords].reverse().map((record, index) => {
               const realIndex = businessRecords.length - 1 - index;
               const isEditing = editingBusinessRecordIndex === realIndex;
@@ -2091,12 +2071,7 @@ function AppInner() {
                     <>
                       <button
                         type="button"
-                        onClick={() => {
-                          updateHistory(realIndex, 'contacts', draftBusinessRecord.contacts);
-                          updateHistory(realIndex, 'gatherings', draftBusinessRecord.gatherings);
-                          updateHistory(realIndex, 'strangers', draftBusinessRecord.strangers);
-                          setEditingBusinessRecordIndex(null);
-                        }}
+                        onClick={() => commitHistoryEdit(realIndex, draftBusinessRecord)}
                         className="p-2 rounded-lg text-slate-600 md:hover:bg-slate-100 md:hover:text-slate-800"
                         aria-label="儲存"
                       >
