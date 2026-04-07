@@ -6,7 +6,7 @@ import {
   Home, Crosshair,
   CalendarClock, Presentation, Phone, RefreshCw, GitBranch, Megaphone,
   Mail, CalendarRange, CalendarOff, Mic2, Headphones, Package, LogOut,
-  Gem, BarChart2, Trash2, Database, Plus
+  Gem, BarChart2, Trash2, Settings, Plus
 } from 'lucide-react';
 
 // --- Data Constants ---
@@ -185,9 +185,16 @@ const getStyleByTitle = (title) => {
 
 // --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
 const STORAGE_KEY = 'road-to-diamond-game-v1';
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
-/** 以本地時間每日 04:00 為「遊戲日」切換點 */
+const DEFAULT_SETTLEMENT_TIME = { hour: 4, minute: 0 };
+
+const DEFAULT_STAT_TARGETS = {
+  contacts: { label: '聯絡人數', target: 10 },
+  gatherings: { label: '聚會場次', target: 3 },
+  strangers: { label: '認識人數', target: 1 },
+};
+
 function formatLocalYMD(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -195,12 +202,38 @@ function formatLocalYMD(d) {
   return `${y}-${m}-${day}`;
 }
 
-function getGameDayKey(d = new Date()) {
+/** 以本地時間「每日結算時刻」為遊戲日切換點 */
+function getGameDayKey(d = new Date(), settlement = DEFAULT_SETTLEMENT_TIME) {
+  const h = Math.max(0, Math.min(23, Number(settlement.hour) || 0));
+  const min = Math.max(0, Math.min(59, Number(settlement.minute) || 0));
+  const boundaryMin = h * 60 + min;
   const x = new Date(d);
-  if (x.getHours() < 4) {
+  const nowMin = x.getHours() * 60 + x.getMinutes();
+  if (nowMin < boundaryMin) {
     x.setDate(x.getDate() - 1);
   }
   return formatLocalYMD(x);
+}
+
+function normalizeSettlementTime(t) {
+  if (!t || typeof t !== 'object') return { ...DEFAULT_SETTLEMENT_TIME };
+  return {
+    hour: Math.max(0, Math.min(23, Number(t.hour) ?? DEFAULT_SETTLEMENT_TIME.hour)),
+    minute: Math.max(0, Math.min(59, Number(t.minute) ?? DEFAULT_SETTLEMENT_TIME.minute)),
+  };
+}
+
+function normalizeStatTargets(s) {
+  if (!s || typeof s !== 'object') return { ...DEFAULT_STAT_TARGETS };
+  const pick = (key, def) => ({
+    label: typeof s[key]?.label === 'string' && s[key].label.trim() ? s[key].label.trim().slice(0, 32) : def.label,
+    target: Math.max(1, Math.min(99999, Number(s[key]?.target) ?? def.target)),
+  });
+  return {
+    contacts: pick('contacts', DEFAULT_STAT_TARGETS.contacts),
+    gatherings: pick('gatherings', DEFAULT_STAT_TARGETS.gatherings),
+    strangers: pick('strangers', DEFAULT_STAT_TARGETS.strangers),
+  };
 }
 
 function getNextGameDayKey(dayStr) {
@@ -376,7 +409,8 @@ function initialCompletedLineCount(grid) {
 }
 
 function createFreshGameState() {
-  const today = getGameDayKey();
+  const st = { ...DEFAULT_SETTLEMENT_TIME };
+  const today = getGameDayKey(new Date(), st);
   return {
     baseExp: 0,
     seasonRecord: { wins: 0, losses: 0 },
@@ -394,6 +428,8 @@ function createFreshGameState() {
     lastPlayDate: today,
     guidanceQuotes: [...DAILY_GUIDANCE_QUOTES],
     failureTypes: buildDefaultFailureTypesData(),
+    statTargets: normalizeStatTargets(null),
+    settlementTime: { ...DEFAULT_SETTLEMENT_TIME },
   };
 }
 
@@ -405,7 +441,9 @@ function loadPersistedGameState() {
     const fileVersion = d.v ?? 1;
     if (fileVersion > SAVE_VERSION) return null;
 
-    const targetGameDay = getGameDayKey();
+    const settlementTime = normalizeSettlementTime(d.settlementTime);
+    const statTargets = normalizeStatTargets(d.statTargets);
+    const targetGameDay = getGameDayKey(new Date(), settlementTime);
     const guidanceQuotes =
       Array.isArray(d.guidanceQuotes) && d.guidanceQuotes.length > 0
         ? d.guidanceQuotes.map((q) => String(q))
@@ -473,6 +511,8 @@ function loadPersistedGameState() {
       lastPlayDate: settled.lastPlayDate,
       guidanceQuotes,
       failureTypes,
+      statTargets,
+      settlementTime,
     };
   } catch {
     return null;
@@ -514,10 +554,14 @@ export default function App() {
   
   const [guidanceQuotes, setGuidanceQuotes] = useState(INITIAL_GAME.guidanceQuotes);
   const [failureTypes, setFailureTypes] = useState(INITIAL_GAME.failureTypes);
+  const [statTargets, setStatTargets] = useState(INITIAL_GAME.statTargets);
+  const [settlementTime, setSettlementTime] = useState(INITIAL_GAME.settlementTime);
+  const [iconPickerOpenId, setIconPickerOpenId] = useState(null);
 
   const pressTimer = useRef(null);
   const isLongPress = useRef(false);
   const lastPlayDateRef = useRef(INITIAL_GAME.lastPlayDate);
+  const settlementTimeRef = useRef(INITIAL_GAME.settlementTime);
   const gridStateRef = useRef(INITIAL_GAME.gridState);
   const todayStatsRef = useRef(INITIAL_GAME.todayStats);
   const businessRecordsRef = useRef(INITIAL_GAME.businessRecords);
@@ -545,16 +589,16 @@ export default function App() {
   const guidanceDrawTimerRef = useRef(null);
 
   useEffect(() => {
-    const gk = getGameDayKey();
+    const gk = getGameDayKey(new Date(), settlementTime);
     setGuidanceDaily((prev) => (prev.dayKey === gk ? prev : { dayKey: gk, draws: [] }));
-  }, [activeTab]);
+  }, [activeTab, settlementTime]);
 
   useEffect(() => {
-    const gk = getGameDayKey();
+    const gk = getGameDayKey(new Date(), settlementTime);
     if (guidanceDaily.dayKey === gk && guidanceDaily.draws.length === 0) {
       setGuidanceRevealNonce(0);
     }
-  }, [guidanceDaily.dayKey, guidanceDaily.draws.length]);
+  }, [guidanceDaily.dayKey, guidanceDaily.draws.length, settlementTime]);
 
   useEffect(() => {
     gridStateRef.current = gridState;
@@ -567,6 +611,7 @@ export default function App() {
     hasPerfectDayTodayRef.current = hasPerfectDayToday;
     statRewardsRef.current = statRewards;
     guidanceDailyRef.current = guidanceDaily;
+    settlementTimeRef.current = settlementTime;
   });
 
   useEffect(() => {
@@ -578,7 +623,7 @@ export default function App() {
   useEffect(() => {
     const payload = {
       v: SAVE_VERSION,
-      lastPlayDate: getGameDayKey(),
+      lastPlayDate: getGameDayKey(new Date(), settlementTime),
       baseExp,
       seasonRecord,
       habits,
@@ -594,6 +639,8 @@ export default function App() {
       guidanceDaily,
       guidanceQuotes,
       failureTypes,
+      statTargets,
+      settlementTime,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -616,11 +663,13 @@ export default function App() {
     guidanceDaily,
     guidanceQuotes,
     failureTypes,
+    statTargets,
+    settlementTime,
   ]);
 
   useEffect(() => {
     const runSettlement = () => {
-      const target = getGameDayKey();
+      const target = getGameDayKey(new Date(), settlementTimeRef.current);
       if (lastPlayDateRef.current === target) return;
       const snap = {
         lastPlayDate: lastPlayDateRef.current,
@@ -659,7 +708,22 @@ export default function App() {
       clearInterval(id);
       document.removeEventListener('visibilitychange', onVis);
     };
-  }, []);
+  }, [settlementTime]);
+
+  useEffect(() => {
+    setIconPickerOpenId(null);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!iconPickerOpenId) return;
+    const onDocDown = (e) => {
+      const wrap = e.target.closest?.('[data-settings-icon-picker]');
+      if (wrap) return;
+      setIconPickerOpenId(null);
+    };
+    document.addEventListener('mousedown', onDocDown);
+    return () => document.removeEventListener('mousedown', onDocDown);
+  }, [iconPickerOpenId]);
 
   // --- Logic & Effects ---
 
@@ -807,9 +871,9 @@ export default function App() {
     let newRewards = { ...statRewards };
     let animTexts = [];
 
-    const metC = newStats.contacts >= 10;
-    const metG = newStats.gatherings >= 3;
-    const metS = newStats.strangers >= 1;
+    const metC = newStats.contacts >= statTargets.contacts.target;
+    const metG = newStats.gatherings >= statTargets.gatherings.target;
+    const metS = newStats.strangers >= statTargets.strangers.target;
     const metCount = [metC, metG, metS].filter(Boolean).length;
 
     if (metC && !newRewards.contacts) { expChange += 1; newRewards.contacts = true; animTexts.push({ text: '聯絡達標！ +1 EXP', type: 'cell' }); }
@@ -888,7 +952,7 @@ export default function App() {
   const recordFailure = (typeObj, customText = "") => {
     const textToSave = customText || typeObj.label;
     const now = new Date();
-    const day = getGameDayKey(now);
+    const day = getGameDayKey(now, settlementTime);
     setFailures([
       {
         id: `${now.getTime()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -921,9 +985,9 @@ export default function App() {
 
   const calculateDayExp = (stats) => {
     let exp = 0;
-    const c = stats.contacts >= 10;
-    const g = stats.gatherings >= 3;
-    const s = stats.strangers >= 1;
+    const c = stats.contacts >= statTargets.contacts.target;
+    const g = stats.gatherings >= statTargets.gatherings.target;
+    const s = stats.strangers >= statTargets.strangers.target;
     const count = [c, g, s].filter(Boolean).length;
     
     if (c) exp += 1;
@@ -951,12 +1015,12 @@ export default function App() {
     }
   };
 
-  const guidanceTodayKey = getGameDayKey();
+  const guidanceTodayKey = getGameDayKey(new Date(), settlementTime);
   const guidanceDrawsToday = guidanceDaily.dayKey === guidanceTodayKey ? guidanceDaily.draws : [];
   const guidanceRemainingToday = Math.max(0, GUIDANCE_DRAWS_PER_DAY - guidanceDrawsToday.length);
 
   const drawTodayGuidance = () => {
-    const today = getGameDayKey();
+    const today = getGameDayKey(new Date(), settlementTime);
     setGuidanceDaily((prev) => {
       const base = prev.dayKey === today ? prev : { dayKey: today, draws: [] };
       if (base.draws.length >= GUIDANCE_DRAWS_PER_DAY) return base;
@@ -964,7 +1028,7 @@ export default function App() {
       const quote =
         pool.length > 0
           ? pool[Math.floor(Math.random() * pool.length)]
-          : '（請至「資料庫」分頁新增今日指引金句）';
+          : '（請至「設定」新增指引內容）';
       return { ...base, draws: [...base.draws, quote] };
     });
   };
@@ -1124,27 +1188,27 @@ export default function App() {
                 onPointerDown={() => handlePointerDown('contacts')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('contacts', e)}
                 className="bg-emerald-50 hover:bg-emerald-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-emerald-100 select-none shadow-sm relative"
               >
-                <span className="text-xs font-bold text-emerald-700 mb-1">聯絡人數</span>
+                <span className="text-xs font-bold text-emerald-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.contacts.label}</span>
                 <span className="text-2xl font-black text-emerald-600 leading-none">{todayStats.contacts}</span>
-                <span className="text-[10px] text-emerald-400 mt-1">/ 10</span>
+                <span className="text-[10px] text-emerald-400 mt-1">/ {statTargets.contacts.target}</span>
               </button>
               
               <button 
                 onPointerDown={() => handlePointerDown('gatherings')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('gatherings', e)}
                 className="bg-blue-50 hover:bg-blue-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-blue-100 select-none shadow-sm relative"
               >
-                <span className="text-xs font-bold text-blue-700 mb-1">聚會場次</span>
+                <span className="text-xs font-bold text-blue-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.gatherings.label}</span>
                 <span className="text-2xl font-black text-blue-600 leading-none">{todayStats.gatherings}</span>
-                <span className="text-[10px] text-blue-400 mt-1">/ 3</span>
+                <span className="text-[10px] text-blue-400 mt-1">/ {statTargets.gatherings.target}</span>
               </button>
               
               <button 
                 onPointerDown={() => handlePointerDown('strangers')} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={e => e.preventDefault()} onClick={(e) => handleStatClick('strangers', e)}
                 className="bg-purple-50 hover:bg-purple-100 active:scale-95 transition-all p-3 rounded-2xl flex flex-col items-center border border-purple-100 select-none shadow-sm relative"
               >
-                <span className="text-xs font-bold text-purple-700 mb-1">認識人數</span>
+                <span className="text-xs font-bold text-purple-700 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.strangers.label}</span>
                 <span className="text-2xl font-black text-purple-600 leading-none">{todayStats.strangers}</span>
-                <span className="text-[10px] text-purple-400 mt-1">/ 1</span>
+                <span className="text-[10px] text-purple-400 mt-1">/ {statTargets.strangers.target}</span>
               </button>
            </div>
         </div>
@@ -1241,7 +1305,7 @@ export default function App() {
 
         {failureTypes.length === 0 && (
           <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl py-3 px-3 mb-4">
-            尚未設定快捷按鈕，請至下方「資料庫」分頁新增。
+            尚未設定快捷按鈕，請至「設定」新增。
           </p>
         )}
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -1326,15 +1390,10 @@ export default function App() {
   const renderStats = () => {
     return (
       <div className="space-y-6 animate-fadeIn pb-8">
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
-          <h3 className="font-bold text-gray-800 mb-1 flex items-center gap-2">
-            <Trophy size={18} className="text-amber-500" /> 今日比賽結算（04:00）
-          </h3>
-          <p className="text-xs text-gray-500 mb-3 leading-relaxed">
-            每日本地 04:00 結算上一遊戲日：九宮格九格全達成計勝，否則計負；當日比賽數據會寫入下方歷史紀錄。
-          </p>
-          <p className="text-xl font-black text-indigo-700">
-            本季累計：{seasonRecord.wins} 勝 <span className="text-gray-400 font-bold">/</span> {seasonRecord.losses} 負
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4">
+          <p className="text-xs text-slate-500 mb-2">本季目前戰績</p>
+          <p className="text-2xl font-bold text-slate-800 tabular-nums">
+            {seasonRecord.wins} 勝 <span className="text-slate-300 font-normal">·</span> {seasonRecord.losses} 負
           </p>
         </div>
 
@@ -1348,15 +1407,15 @@ export default function App() {
           </h3>
           <div className="grid grid-cols-3 gap-2 text-center divide-x divide-white/20 relative z-10">
             <div>
-              <p className="text-xs text-indigo-200 mb-1">聯絡</p>
+              <p className="text-xs text-indigo-200 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.contacts.label}</p>
               <p className="text-3xl font-black">{businessStats.avgs.contacts}</p>
             </div>
             <div>
-              <p className="text-xs text-indigo-200 mb-1">聚會</p>
+              <p className="text-xs text-indigo-200 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.gatherings.label}</p>
               <p className="text-3xl font-black">{businessStats.avgs.gatherings}</p>
             </div>
             <div>
-              <p className="text-xs text-indigo-200 mb-1">認識陌生人</p>
+              <p className="text-xs text-indigo-200 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.strangers.label}</p>
               <p className="text-3xl font-black">{businessStats.avgs.strangers}</p>
             </div>
           </div>
@@ -1372,17 +1431,17 @@ export default function App() {
           </h3>
           <div className="grid grid-cols-3 gap-3 text-center relative z-10 divide-x divide-blue-200">
             <div>
-              <p className="text-xs text-blue-600 mb-1">聯絡人數</p>
+              <p className="text-xs text-blue-600 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.contacts.label}</p>
               <p className="text-2xl font-black text-blue-900">{businessStats.totals.contacts}</p>
               <p className="text-[10px] text-blue-500 mt-1 bg-white rounded-full inline-block px-2 py-0.5 border border-blue-100 whitespace-nowrap">最高: {businessStats.highest.contacts}</p>
             </div>
             <div>
-              <p className="text-xs text-blue-600 mb-1">聚會場次</p>
+              <p className="text-xs text-blue-600 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.gatherings.label}</p>
               <p className="text-2xl font-black text-blue-900">{businessStats.totals.gatherings}</p>
               <p className="text-[10px] text-blue-500 mt-1 bg-white rounded-full inline-block px-2 py-0.5 border border-blue-100 whitespace-nowrap">最高: {businessStats.highest.gatherings}</p>
             </div>
             <div>
-              <p className="text-xs text-blue-600 mb-1">認識人數</p>
+              <p className="text-xs text-blue-600 mb-1 line-clamp-2 min-h-[2rem]">{statTargets.strangers.label}</p>
               <p className="text-2xl font-black text-blue-900">{businessStats.totals.strangers}</p>
               <p className="text-[10px] text-blue-500 mt-1 bg-white rounded-full inline-block px-2 py-0.5 border border-blue-100 whitespace-nowrap">最高: {businessStats.highest.strangers}</p>
             </div>
@@ -1433,131 +1492,187 @@ export default function App() {
     );
   };
 
-  const renderDatabase = () => (
-    <div className="space-y-6 animate-fadeIn pb-8">
-      <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
-        <h2 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
-          <Database size={20} className="text-indigo-500" /> 今日指引金句
-        </h2>
-        <p className="text-xs text-gray-500 mb-4">管理金句庫；首頁「抽取今日指引」只會從這裡抽選。</p>
-        <ul className="space-y-2 max-h-64 overflow-y-auto">
-          {guidanceQuotes.map((q, i) => (
-            <li key={`gq-${i}`} className="flex gap-2">
-              <textarea
-                value={q}
-                onChange={(e) => {
-                  const next = [...guidanceQuotes];
-                  next[i] = e.target.value;
-                  setGuidanceQuotes(next);
-                }}
-                className="flex-1 text-sm rounded-xl border border-gray-200 p-2 min-h-[60px]"
-                rows={2}
-              />
-              <button
-                type="button"
-                onClick={() => setGuidanceQuotes(guidanceQuotes.filter((_, j) => j !== i))}
-                className="shrink-0 text-rose-500 p-2 rounded-lg hover:bg-rose-50"
-                aria-label="刪除此句"
-              >
-                <Trash2 size={18} />
-              </button>
-            </li>
-          ))}
-        </ul>
-        <button
-          type="button"
-          onClick={() => setGuidanceQuotes([...guidanceQuotes, ''])}
-          className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-indigo-200 text-indigo-600 font-bold text-sm"
-        >
-          <Plus size={18} /> 新增金句
-        </button>
-      </div>
-
-      <div className="bg-white rounded-3xl p-5 shadow-sm border border-indigo-50">
-        <h2 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
-          <Sparkles size={20} className="text-amber-500" /> 學習紀錄快捷按鈕
-        </h2>
-        <p className="text-xs text-gray-500 mb-4">自訂名稱、經驗值與圖示；學習紀錄頁會依此顯示快捷按鈕。</p>
-        <div className="space-y-3 max-h-80 overflow-y-auto">
-          {failureTypes.map((ft, i) => {
-            const IconComp = ICON_MAP[ft.iconKey] || Mail;
-            return (
-              <div key={ft.id} className="flex flex-col gap-2 border border-gray-100 rounded-xl p-3">
-                <div className="flex items-center gap-2">
-                  <IconComp size={20} className="text-indigo-500 shrink-0" />
-                  <input
-                    value={ft.label}
-                    onChange={(e) => {
-                      const next = [...failureTypes];
-                      next[i] = { ...ft, label: e.target.value };
-                      setFailureTypes(next);
-                    }}
-                    className="flex-1 text-sm font-bold border border-gray-200 rounded-lg px-2 py-1.5"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    max={99999}
-                    value={ft.exp}
-                    onChange={(e) => {
-                      const next = [...failureTypes];
-                      next[i] = { ...ft, exp: Math.max(0, Number(e.target.value) || 0) };
-                      setFailureTypes(next);
-                    }}
-                    className="w-16 text-sm text-center border border-gray-200 rounded-lg py-1.5"
-                  />
-                </div>
-                <div className="flex items-center gap-2 justify-between">
-                  <select
-                    value={ft.iconKey}
-                    onChange={(e) => {
-                      const next = [...failureTypes];
-                      next[i] = { ...ft, iconKey: e.target.value };
-                      setFailureTypes(next);
-                    }}
-                    className="text-xs border border-gray-200 rounded-lg px-2 py-2 flex-1"
-                  >
-                    {FAILURE_ICON_KEYS.map((k) => (
-                      <option key={k} value={k}>
-                        {k}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setFailureTypes(failureTypes.filter((_, j) => j !== i))}
-                    className="text-rose-500 p-2 rounded-lg hover:bg-rose-50"
-                    aria-label="刪除此按鈕"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+  const renderSettings = () => {
+    const timeInputValue = `${String(settlementTime.hour).padStart(2, '0')}:${String(settlementTime.minute).padStart(2, '0')}`;
+    const updateStatTarget = (key, field, val) => {
+      setStatTargets((prev) => ({
+        ...prev,
+        [key]: {
+          ...prev[key],
+          [field]: field === 'target' ? Math.max(1, Math.min(99999, Number(val) || 1)) : String(val).slice(0, 32),
+        },
+      }));
+    };
+    return (
+      <div className="space-y-5 animate-fadeIn pb-8">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-800 mb-3">今日指引</h2>
+          <ul className="space-y-2 max-h-52 overflow-y-auto">
+            {guidanceQuotes.map((q, i) => (
+              <li key={`gq-${i}`} className="flex gap-2">
+                <textarea
+                  value={q}
+                  onChange={(e) => {
+                    const next = [...guidanceQuotes];
+                    next[i] = e.target.value;
+                    setGuidanceQuotes(next);
+                  }}
+                  className="flex-1 text-sm rounded-lg border border-slate-200 p-2 min-h-[52px] text-slate-800"
+                  rows={2}
+                />
+                <button
+                  type="button"
+                  onClick={() => setGuidanceQuotes(guidanceQuotes.filter((_, j) => j !== i))}
+                  className="shrink-0 text-slate-400 p-2 rounded-lg hover:bg-slate-50 hover:text-rose-500"
+                  aria-label="刪除"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => setGuidanceQuotes([...guidanceQuotes, ''])}
+            className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() =>
-            setFailureTypes([
-              ...failureTypes,
-              { id: `ft-${Date.now()}`, label: '新按鈕', exp: 1, iconKey: 'Mail' },
-            ])
-          }
-          className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-indigo-200 text-indigo-600 font-bold text-sm"
-        >
-          <Plus size={18} /> 新增按鈕
-        </button>
-      </div>
 
-      <div className="bg-slate-100 rounded-2xl p-4 text-xs text-slate-600 leading-relaxed">
-        <p className="font-bold text-slate-700 mb-1">每日結算（本地 04:00）</p>
-        <p>
-          以裝置本地時間每日 04:00 為「遊戲日」切換。結算時會把當日比賽數據寫入 Stats 歷史；九宮格九格全達成計一勝，否則計一負。跨日時會重置今日比賽數據與大三元相關狀態。
-        </p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-800 mb-3">學習紀錄</h2>
+          <div className="space-y-3 max-h-72 overflow-y-auto">
+            {failureTypes.map((ft, i) => {
+              const IconComp = ICON_MAP[ft.iconKey] || Mail;
+              return (
+                <div key={ft.id} className="flex gap-2 items-start border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                  <div className="relative shrink-0" data-settings-icon-picker>
+                    <button
+                      type="button"
+                      onClick={() => setIconPickerOpenId(iconPickerOpenId === ft.id ? null : ft.id)}
+                      className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
+                      aria-label="選擇圖示"
+                    >
+                      <IconComp size={20} />
+                    </button>
+                    {iconPickerOpenId === ft.id && (
+                      <div
+                        className="absolute z-[60] left-0 top-full mt-1 w-[220px] rounded-xl border border-slate-200 bg-white p-2 shadow-lg grid grid-cols-5 gap-1"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {FAILURE_ICON_KEYS.map((k) => {
+                          const Ic = ICON_MAP[k];
+                          return (
+                            <button
+                              key={k}
+                              type="button"
+                              className={`rounded-md p-2 hover:bg-slate-100 ${ft.iconKey === k ? 'ring-1 ring-indigo-400 bg-indigo-50' : ''}`}
+                              onClick={() => {
+                                const next = [...failureTypes];
+                                next[i] = { ...ft, iconKey: k };
+                                setFailureTypes(next);
+                                setIconPickerOpenId(null);
+                              }}
+                            >
+                              <Ic size={18} className="mx-auto text-slate-700" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <input
+                      value={ft.label}
+                      onChange={(e) => {
+                        const next = [...failureTypes];
+                        next[i] = { ...ft, label: e.target.value };
+                        setFailureTypes(next);
+                      }}
+                      className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-slate-800"
+                      placeholder="名稱"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">EXP</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={99999}
+                        value={ft.exp}
+                        onChange={(e) => {
+                          const next = [...failureTypes];
+                          next[i] = { ...ft, exp: Math.max(0, Number(e.target.value) || 0) };
+                          setFailureTypes(next);
+                        }}
+                        className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1 text-center"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFailureTypes(failureTypes.filter((_, j) => j !== i))}
+                        className="ml-auto text-slate-400 p-1.5 rounded-lg hover:bg-rose-50 hover:text-rose-500"
+                        aria-label="刪除"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setFailureTypes([...failureTypes, { id: `ft-${Date.now()}`, label: '新項目', exp: 1, iconKey: 'Mail' }])
+            }
+            className="mt-3 w-full py-2 rounded-lg border border-dashed border-slate-300 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            <Plus size={16} className="inline mr-1 -mt-0.5" /> 新增
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-800 mb-3">今日比賽數據</h2>
+          <p className="text-xs text-slate-500 mb-3">首頁三格按鈕的顯示名稱與達標數字。</p>
+          {(['contacts', 'gatherings', 'strangers']).map((key) => (
+            <div key={key} className="flex gap-2 items-center mb-2 last:mb-0">
+              <input
+                value={statTargets[key].label}
+                onChange={(e) => updateStatTarget(key, 'label', e.target.value)}
+                className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5"
+                placeholder="項目名稱"
+              />
+              <input
+                type="number"
+                min={1}
+                max={99999}
+                value={statTargets[key].target}
+                onChange={(e) => updateStatTarget(key, 'target', e.target.value)}
+                className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1.5 text-center"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-slate-800 mb-2">每日結算時間</h2>
+          <p className="text-xs text-slate-500 mb-2">本地時間到點後切換遊戲日並結算。</p>
+          <input
+            type="time"
+            value={timeInputValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              const [hh, mm] = v.split(':').map(Number);
+              setSettlementTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
+            }}
+            className="text-sm border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
+          />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // --- Main Layout ---
   return (
@@ -1583,7 +1698,7 @@ export default function App() {
           {activeTab === 'home' && renderHome()}
           {activeTab === 'failures' && renderFailures()}
           {activeTab === 'stats' && renderStats()}
-          {activeTab === 'database' && renderDatabase()}
+          {activeTab === 'settings' && renderSettings()}
         </main>
 
         {/* --- Global Animations Overlays --- */}
@@ -1682,9 +1797,9 @@ export default function App() {
             <span className="text-[9px] font-bold truncate w-full text-center">Stats</span>
           </button>
 
-          <button onClick={() => setActiveTab('database')} className={`flex flex-col items-center gap-0.5 p-1.5 flex-1 min-w-0 transition-colors ${activeTab === 'database' ? 'text-violet-600' : 'text-gray-400'}`}>
-            <div className={`p-1 rounded-xl ${activeTab === 'database' ? 'bg-violet-50' : ''}`}><Database size={20} /></div>
-            <span className="text-[9px] font-bold truncate w-full text-center">資料庫</span>
+          <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-0.5 p-1.5 flex-1 min-w-0 transition-colors ${activeTab === 'settings' ? 'text-slate-700' : 'text-gray-400'}`}>
+            <div className={`p-1 rounded-xl ${activeTab === 'settings' ? 'bg-slate-100' : ''}`}><Settings size={20} /></div>
+            <span className="text-[9px] font-bold truncate w-full text-center">設定</span>
           </button>
         </nav>
       </div>
