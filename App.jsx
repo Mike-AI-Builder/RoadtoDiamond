@@ -1174,8 +1174,9 @@ function AppInner() {
     return all.reduce(
       (acc, r) => {
         const m = getDayMilestones(r);
-        if (m.doubleDouble) acc.doubleDouble += 1;
+        // 大三元通常同時滿足 Double Double，但為避免重複計數：同一天若為大三元，Double Double 不另外 +1
         if (m.tripleDouble) acc.tripleDouble += 1;
+        else if (m.doubleDouble) acc.doubleDouble += 1;
         return acc;
       },
       { doubleDouble: 0, tripleDouble: 0 }
