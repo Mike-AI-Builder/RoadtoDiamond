@@ -1227,15 +1227,15 @@ function AppInner() {
   }, [gridState]);
 
   const businessStats = useMemo(() => {
-    const allRecords = [...businessRecords, todayStats];
-    const days = businessRecords.length > 0 ? businessRecords.length + 1 : 1; 
-    const totals = allRecords.reduce((acc, curr) => ({
+    // 結算前：todayStats 仍屬「當日進行中」，本季平均/累計/最高都只看已結算進 businessRecords 的資料
+    const days = Math.max(1, businessRecords.length);
+    const totals = businessRecords.reduce((acc, curr) => ({
       contacts: acc.contacts + (Number(curr.contacts) || 0),
       gatherings: acc.gatherings + (Number(curr.gatherings) || 0),
       strangers: acc.strangers + (Number(curr.strangers) || 0),
     }), { contacts: 0, gatherings: 0, strangers: 0 });
 
-    const highest = allRecords.reduce((acc, curr) => ({
+    const highest = businessRecords.reduce((acc, curr) => ({
       contacts: Math.max(acc.contacts, Number(curr.contacts) || 0),
       gatherings: Math.max(acc.gatherings, Number(curr.gatherings) || 0),
       strangers: Math.max(acc.strangers, Number(curr.strangers) || 0),
@@ -1251,7 +1251,7 @@ function AppInner() {
       days,
       highest
     };
-  }, [businessRecords, todayStats]);
+  }, [businessRecords]);
 
   const heatTier = (n) => {
     const x = Number(n) || 0;
