@@ -349,6 +349,12 @@ const SAVE_VERSION = 5;
 
 const DEFAULT_SETTLEMENT_TIME = { hour: 4, minute: 0 };
 
+const DEFAULT_MILESTONE_RULES = {
+  // 三項數據中要達標幾項才算 Double Double / 大三元
+  doubleDoubleNeed: 2,
+  tripleDoubleNeed: 3,
+};
+
 const DEFAULT_STAT_TARGETS = {
   contacts: { label: '', target: 1 },
   gatherings: { label: '', target: 1 },
@@ -394,6 +400,15 @@ function normalizeStatTargets(s) {
     gatherings: pick('gatherings', DEFAULT_STAT_TARGETS.gatherings),
     strangers: pick('strangers', DEFAULT_STAT_TARGETS.strangers),
   };
+}
+
+function normalizeMilestoneRules(r) {
+  if (!r || typeof r !== 'object') return { ...DEFAULT_MILESTONE_RULES };
+  const dd = Math.max(1, Math.min(3, Number(r.doubleDoubleNeed) || DEFAULT_MILESTONE_RULES.doubleDoubleNeed));
+  const td = Math.max(1, Math.min(3, Number(r.tripleDoubleNeed) || DEFAULT_MILESTONE_RULES.tripleDoubleNeed));
+  // 大三元門檻不應低於 Double Double（避免語意混亂）
+  const triple = Math.max(dd, td);
+  return { doubleDoubleNeed: dd, tripleDoubleNeed: triple };
 }
 
 function isStatTargetsConfigured(t) {
@@ -643,6 +658,7 @@ function createFreshGameState() {
     guidanceQuotes: [...DAILY_GUIDANCE_QUOTES],
     failureTypes: buildDefaultFailureTypesData(),
     statTargets: normalizeStatTargets(null),
+    milestoneRules: { ...DEFAULT_MILESTONE_RULES },
     settlementTime: { ...DEFAULT_SETTLEMENT_TIME },
   };
 }
@@ -657,6 +673,7 @@ function loadPersistedGameState() {
 
     const settlementTime = normalizeSettlementTime(d.settlementTime);
     const statTargets = normalizeStatTargets(d.statTargets);
+    const milestoneRules = normalizeMilestoneRules(d.milestoneRules);
     const targetGameDay = getGameDayKey(new Date(), settlementTime);
     const guidanceQuotes =
       Array.isArray(d.guidanceQuotes) && d.guidanceQuotes.length > 0
@@ -757,6 +774,7 @@ function loadPersistedGameState() {
       guidanceQuotes,
       failureTypes,
       statTargets,
+      milestoneRules,
       settlementTime,
     };
   } catch {
