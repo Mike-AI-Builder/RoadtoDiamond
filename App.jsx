@@ -1276,8 +1276,8 @@ function AppInner() {
   };
 
   const milestoneCounts = useMemo(() => {
-    const all = [...businessRecords, todayStats];
-    return all.reduce(
+    // 結算前：todayStats 仍屬「當日進行中」，不計入累積里程碑次數（避免未結算就先+1）
+    return businessRecords.reduce(
       (acc, r) => {
         const m = getDayMilestones(r);
         // 大三元通常同時滿足 Double Double，但為避免重複計數：同一天若為大三元，Double Double 不另外 +1
@@ -1287,7 +1287,7 @@ function AppInner() {
       },
       { doubleDouble: 0, tripleDouble: 0 }
     );
-  }, [businessRecords, todayStats, statTargets, milestoneRules]);
+  }, [businessRecords, statTargets, milestoneRules]);
 
   useEffect(() => {
     if (bingoStats.isWin && !hasWonToday) {
