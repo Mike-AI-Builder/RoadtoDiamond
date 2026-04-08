@@ -1929,6 +1929,12 @@ function AppInner() {
   );
 
   const renderStats = () => {
+    const currentGameDayKey = getGameDayKey(new Date(), settlementTime);
+    // 勝敗（seasonRecord）是在跨遊戲日結算時才寫入；但連勝（streak）在今天完成時即時更新。
+    // 為避免使用者看到「連勝已增加但勝敗尚未入帳」的不一致，顯示時把今日已勝（未結算）先納入。
+    const showPendingTodayWin = lastPlayDateRef.current === currentGameDayKey && hasWonToday;
+    const displaySeasonWins = seasonRecord.wins + (showPendingTodayWin ? 1 : 0);
+    const displaySeasonLosses = seasonRecord.losses;
     return (
       <div className="relative space-y-6 animate-fadeIn pb-8">
         <div
@@ -1948,7 +1954,7 @@ function AppInner() {
           </div>
           <p className="relative z-10 text-xs text-slate-500 mb-2">本季目前戰績</p>
           <p className="relative z-10 text-2xl font-bold text-slate-800 tabular-nums">
-            {seasonRecord.wins} 勝 <span className="text-slate-300 font-normal">·</span> {seasonRecord.losses} 負
+            {displaySeasonWins} 勝 <span className="text-slate-300 font-normal">·</span> {displaySeasonLosses} 負
           </p>
           <div className="relative z-10 mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
