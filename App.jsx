@@ -1832,9 +1832,10 @@ function AppInner() {
               <button
                 type="button"
                 onClick={() => setIsAdjustingBingoAfterWin((v) => !v)}
-                className="shrink-0 bg-white text-green-700 border border-green-200 px-3 py-1.5 rounded-lg text-xs font-black active:scale-[0.99] transition-all"
+                className="shrink-0 bg-white text-green-700 border border-green-200 p-2 rounded-lg text-xs font-black active:scale-[0.99] transition-all"
+                aria-label={isAdjustingBingoAfterWin ? '完成' : '修正'}
               >
-                {isAdjustingBingoAfterWin ? '完成' : '修正'}
+                {isAdjustingBingoAfterWin ? <Check size={16} /> : <Edit3 size={16} />}
               </button>
             </div>
           )}
@@ -2996,27 +2997,58 @@ function AppInner() {
         .fx-line-cell::after {
           content: "";
           position: absolute;
-          inset: -3px;
+          inset: -5px;
           border-radius: 1.1rem;
           pointer-events: none;
           background:
             conic-gradient(from 180deg,
               rgba(56,189,248,0) 0%,
-              rgba(56,189,248,0.95) 10%,
+              rgba(56,189,248,1) 10%,
               rgba(56,189,248,0) 22%,
-              rgba(56,189,248,0.85) 35%,
+              rgba(56,189,248,0.95) 35%,
               rgba(56,189,248,0) 48%,
-              rgba(56,189,248,0.9) 60%,
+              rgba(56,189,248,1) 60%,
               rgba(56,189,248,0) 72%,
-              rgba(56,189,248,0.95) 86%,
+              rgba(56,189,248,1) 86%,
               rgba(56,189,248,0) 100%);
           mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
           -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
-          padding: 2px;
+          padding: 3px;
           -webkit-mask-composite: xor;
           mask-composite: exclude;
-          animation: electricTrace 900ms ease-out both;
-          box-shadow: 0 0 26px rgba(56,189,248,0.25);
+          animation: electricTrace 1050ms ease-out both;
+          box-shadow:
+            0 0 38px rgba(56,189,248,0.38),
+            0 0 14px rgba(255,255,255,0.22);
+        }
+
+        @keyframes electricRun {
+          0% { background-position: 0% 50%; opacity: 0; }
+          18% { opacity: 1; }
+          100% { background-position: 220% 50%; opacity: 0; }
+        }
+        .fx-line-cell::before {
+          content: "";
+          position: absolute;
+          inset: -7px;
+          border-radius: 1.2rem;
+          pointer-events: none;
+          background: linear-gradient(90deg,
+            rgba(56,189,248,0) 0%,
+            rgba(56,189,248,0.0) 35%,
+            rgba(56,189,248,0.75) 48%,
+            rgba(255,255,255,0.35) 52%,
+            rgba(56,189,248,0.75) 56%,
+            rgba(56,189,248,0.0) 70%,
+            rgba(56,189,248,0) 100%);
+          background-size: 220% 100%;
+          mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+          -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+          padding: 4px;
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          animation: electricRun 900ms ease-out both;
+          filter: blur(0.3px);
         }
 
         @keyframes bingoFrame {
@@ -3030,26 +3062,54 @@ function AppInner() {
         .fx-bingo-win-frame::after {
           content: "";
           position: absolute;
-          inset: -6px;
+          inset: -10px;
           border-radius: 1.65rem;
           pointer-events: none;
           background:
             conic-gradient(from 120deg,
               rgba(251,191,36,0) 0%,
-              rgba(251,191,36,0.95) 12%,
-              rgba(56,189,248,0.9) 22%,
+              rgba(251,191,36,1) 12%,
+              rgba(56,189,248,1) 22%,
               rgba(251,191,36,0) 34%,
-              rgba(255,255,255,0.85) 45%,
+              rgba(255,255,255,0.95) 45%,
               rgba(56,189,248,0) 60%,
-              rgba(251,191,36,0.95) 78%,
+              rgba(251,191,36,1) 78%,
               rgba(251,191,36,0) 100%);
           mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
           -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
-          padding: 3px;
+          padding: 5px;
           -webkit-mask-composite: xor;
           mask-composite: exclude;
-          animation: bingoFrame 1200ms cubic-bezier(.16,1,.3,1) both;
-          box-shadow: 0 0 40px rgba(251,191,36,0.22), 0 0 28px rgba(56,189,248,0.14);
+          animation: bingoFrame 1500ms cubic-bezier(.16,1,.3,1) both;
+          box-shadow:
+            0 0 60px rgba(251,191,36,0.35),
+            0 0 46px rgba(56,189,248,0.22),
+            0 0 18px rgba(255,255,255,0.16);
+        }
+
+        .fx-bingo-win-frame::before {
+          content: "";
+          position: absolute;
+          inset: -14px;
+          border-radius: 1.85rem;
+          pointer-events: none;
+          background: linear-gradient(90deg,
+            rgba(251,191,36,0) 0%,
+            rgba(251,191,36,0.0) 35%,
+            rgba(251,191,36,0.9) 48%,
+            rgba(255,255,255,0.5) 52%,
+            rgba(56,189,248,0.85) 56%,
+            rgba(56,189,248,0.0) 70%,
+            rgba(56,189,248,0) 100%);
+          background-size: 240% 100%;
+          mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+          -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+          padding: 7px;
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          animation: electricRun 1150ms ease-out both;
+          filter: blur(0.2px);
+          opacity: 0.95;
         }
 
         @keyframes statsBurst {
