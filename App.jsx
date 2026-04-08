@@ -1932,7 +1932,9 @@ function AppInner() {
     const currentGameDayKey = getGameDayKey(new Date(), settlementTime);
     // 勝敗（seasonRecord）是在跨遊戲日結算時才寫入；但連勝（streak）在今天完成時即時更新。
     // 為避免使用者看到「連勝已增加但勝敗尚未入帳」的不一致，顯示時把今日已勝（未結算）先納入。
-    const showPendingTodayWin = lastPlayDateRef.current === currentGameDayKey && hasWonToday;
+    // 注意：lastPlayDateRef 會在 runSettlement 執行後才更新；若使用者剛跨日但尚未觸發結算，
+    // 仍可能停留在舊日期，造成判斷失準。因此這裡以 hasWonToday 作為「今日已勝但尚未結算」的顯示依據。
+    const showPendingTodayWin = hasWonToday;
     const displaySeasonWins = seasonRecord.wins + (showPendingTodayWin ? 1 : 0);
     const displaySeasonLosses = seasonRecord.losses;
     return (
