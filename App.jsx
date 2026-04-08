@@ -823,6 +823,9 @@ function AppInner() {
   const [recentExpGain, setRecentExpGain] = useState(0);
   const [failureQuote, setFailureQuote] = useState("");
   const [pendingCelebrate, setPendingCelebrate] = useState(null);
+  const [showLineFx, setShowLineFx] = useState(false);
+  const [lineFxText, setLineFxText] = useState('');
+  const [milestoneFx, setMilestoneFx] = useState(null); // 'dd' | 'td' | null
   const [editingFailureId, setEditingFailureId] = useState(null);
   const [draftFailureDateTime, setDraftFailureDateTime] = useState('');
 
@@ -847,6 +850,9 @@ function AppInner() {
   const [guidanceQuotes, setGuidanceQuotes] = useState(INITIAL_GAME.guidanceQuotes);
   const [failureTypes, setFailureTypes] = useState(INITIAL_GAME.failureTypes);
   const [statTargets, setStatTargets] = useState(INITIAL_GAME.statTargets);
+  const [milestoneRules, setMilestoneRules] = useState(
+    normalizeMilestoneRules(INITIAL_GAME.milestoneRules)
+  );
   const [settlementTime, setSettlementTime] = useState(INITIAL_GAME.settlementTime);
   const [iconPickerOpenId, setIconPickerOpenId] = useState(null);
 
@@ -858,6 +864,9 @@ function AppInner() {
     gatherings: { ...INITIAL_GAME.statTargets.gatherings },
     strangers: { ...INITIAL_GAME.statTargets.strangers },
   }));
+  const [draftMilestoneRules, setDraftMilestoneRules] = useState(() =>
+    normalizeMilestoneRules(INITIAL_GAME.milestoneRules)
+  );
   const [draftSettlementTime, setDraftSettlementTime] = useState(() => ({
     ...INITIAL_GAME.settlementTime,
   }));
@@ -870,6 +879,8 @@ function AppInner() {
   const isLongPress = useRef(false);
   const historyPressTimer = useRef(null);
   const historyIsLongPress = useRef(false);
+  const lineFxTimerRef = useRef(null);
+  const milestoneFxTimerRef = useRef(null);
   const updateNotifiedRef = useRef(false);
   const lastPlayDateRef = useRef(INITIAL_GAME.lastPlayDate);
   const settlementTimeRef = useRef(INITIAL_GAME.settlementTime);
@@ -993,6 +1004,7 @@ function AppInner() {
       guidanceQuotes,
       failureTypes,
       statTargets,
+      milestoneRules,
       settlementTime,
     };
     try {
@@ -1017,6 +1029,7 @@ function AppInner() {
     guidanceQuotes,
     failureTypes,
     statTargets,
+    milestoneRules,
     settlementTime,
   ]);
 
@@ -1168,6 +1181,13 @@ function AppInner() {
     if (bingoStats.completedLines > prevLines) {
       const diff = bingoStats.completedLines - prevLines;
       addFloatingText(window.innerWidth / 2, window.innerHeight * 0.35, `連線！ +${diff * 3} EXP`, 'line');
+      setLineFxText(`連線！ +${diff * 3} EXP`);
+      setShowLineFx(true);
+      if (lineFxTimerRef.current) clearTimeout(lineFxTimerRef.current);
+      lineFxTimerRef.current = setTimeout(() => {
+        setShowLineFx(false);
+        lineFxTimerRef.current = null;
+      }, 1100);
       setPrevLines(bingoStats.completedLines);
     } else if (bingoStats.completedLines < prevLines) {
       setPrevLines(bingoStats.completedLines);
@@ -1215,9 +1235,11 @@ function AppInner() {
     const g = Number(stats.gatherings) >= statTargets.gatherings.target;
     const s = Number(stats.strangers) >= statTargets.strangers.target;
     const metCount = [c, g, s].filter(Boolean).length;
+    const ddNeed = Number(milestoneRules?.doubleDoubleNeed) || DEFAULT_MILESTONE_RULES.doubleDoubleNeed;
+    const tdNeed = Number(milestoneRules?.tripleDoubleNeed) || DEFAULT_MILESTONE_RULES.tripleDoubleNeed;
     return {
-      doubleDouble: metCount >= 2,
-      tripleDouble: metCount === 3,
+      doubleDouble: metCount >= ddNeed,
+      tripleDouble: metCount >= tdNeed,
     };
   };
 
@@ -1233,7 +1255,7 @@ function AppInner() {
       },
       { doubleDouble: 0, tripleDouble: 0 }
     );
-  }, [businessRecords, todayStats, statTargets]);
+  }, [businessRecords, todayStats, statTargets, milestoneRules]);
 
   useEffect(() => {
     if (bingoStats.isWin && !hasWonToday) {
@@ -1325,13 +1347,16 @@ function AppInner() {
   const syncStatRewards = (newStats, eventX = window.innerWidth / 2, eventY = window.innerHeight * 0.4) => {
     if (!statsConfigured) return;
     let expChange = 0;
-    let newRewards = { ...statRewards };
+    const prevRewards = statRewards;
+    let newRewards = { ...prevRewards };
     let animTexts = [];
 
     const metC = newStats.contacts >= statTargets.contacts.target;
     const metG = newStats.gatherings >= statTargets.gatherings.target;
     const metS = newStats.strangers >= statTargets.strangers.target;
     const metCount = [metC, metG, metS].filter(Boolean).length;
+    const ddNeed = Number(milestoneRules?.doubleDoubleNeed) || DEFAULT_MILESTONE_RULES.doubleDoubleNeed;
+    const tdNeed = Number(milestoneRules?.tripleDoubleNeed) || DEFAULT_MILESTONE_RULES.tripleDoubleNeed;
 
     if (metC && !newRewards.contacts) { expChange += 1; newRewards.contacts = true; animTexts.push({ text: '聯絡達標！ +1 EXP', type: 'cell' }); }
     else if (!metC && newRewards.contacts) { expChange -= 1; newRewards.contacts = false; }
@@ -1342,20 +1367,20 @@ function AppInner() {
     if (metS && !newRewards.strangers) { expChange += 1; newRewards.strangers = true; animTexts.push({ text: '新朋友達標！ +1 EXP', type: 'cell' }); }
     else if (!metS && newRewards.strangers) { expChange -= 1; newRewards.strangers = false; }
 
-    if (metCount >= 2 && !newRewards.doubleDouble) { expChange += 3; newRewards.doubleDouble = true; animTexts.push({ text: 'Double Double! +3 EXP', type: 'line' }); }
-    else if (metCount < 2 && newRewards.doubleDouble) { expChange -= 3; newRewards.doubleDouble = false; }
+    if (metCount >= ddNeed && !newRewards.doubleDouble) { expChange += 3; newRewards.doubleDouble = true; animTexts.push({ text: 'Double Double! +3 EXP', type: 'line' }); }
+    else if (metCount < ddNeed && newRewards.doubleDouble) { expChange -= 3; newRewards.doubleDouble = false; }
 
     let newStreak = tripleDoubleStreak;
     let streakBonusToAlert = 0;
 
-    if (metCount === 3 && !newRewards.all) {
+    if (metCount >= tdNeed && !newRewards.all) {
       expChange += 10; newRewards.all = true; animTexts.push({ text: 'Triple Double達成！ +10 EXP', type: 'line' });
       newStreak += 1;
       setTripleDoubleStreak(newStreak);
       
       streakBonusToAlert = getStreakMilestoneBonus(newStreak);
       if (streakBonusToAlert > 0) expChange += streakBonusToAlert;
-    } else if (metCount < 3 && newRewards.all) {
+    } else if (metCount < tdNeed && newRewards.all) {
       expChange -= 10; newRewards.all = false;
       const rollbackBonus = getStreakMilestoneBonus(newStreak);
       if (rollbackBonus > 0) expChange -= rollbackBonus;
@@ -1366,6 +1391,23 @@ function AppInner() {
     if (expChange !== 0) {
       setBaseExp(prev => prev + expChange);
       setStatRewards(newRewards);
+    }
+
+    if (!prevRewards.doubleDouble && newRewards.doubleDouble) {
+      setMilestoneFx('dd');
+      if (milestoneFxTimerRef.current) clearTimeout(milestoneFxTimerRef.current);
+      milestoneFxTimerRef.current = setTimeout(() => {
+        setMilestoneFx(null);
+        milestoneFxTimerRef.current = null;
+      }, 1300);
+    }
+    if (!prevRewards.all && newRewards.all) {
+      setMilestoneFx('td');
+      if (milestoneFxTimerRef.current) clearTimeout(milestoneFxTimerRef.current);
+      milestoneFxTimerRef.current = setTimeout(() => {
+        setMilestoneFx(null);
+        milestoneFxTimerRef.current = null;
+      }, 1500);
     }
 
     animTexts.forEach((anim, idx) => {
@@ -2195,6 +2237,7 @@ function AppInner() {
           gatherings: { ...statTargets.gatherings },
           strangers: { ...statTargets.strangers },
         });
+        setDraftMilestoneRules(normalizeMilestoneRules(milestoneRules));
       }
       if (section === 'settlement') {
         setDraftSettlementTime({ ...settlementTime });
@@ -2245,6 +2288,7 @@ function AppInner() {
       cancelText: '取消',
       onConfirm: () => {
         setStatTargets(normalizeStatTargets(draftStatTargets));
+        setMilestoneRules(normalizeMilestoneRules(draftMilestoneRules));
         cancelSettingsEdit();
         closeConfirm();
       },
@@ -2502,6 +2546,44 @@ function AppInner() {
           {settingsEditingSection === 'stats' ? (
             <>
               <div className="max-h-[52vh] overflow-y-auto pr-1">
+                <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                  <p className="text-xs font-black text-slate-700 mb-2">里程碑條件</p>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-600 w-28 shrink-0">Double Double</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3}
+                      value={draftMilestoneRules.doubleDoubleNeed}
+                      onChange={(e) =>
+                        setDraftMilestoneRules((p) =>
+                          normalizeMilestoneRules({ ...p, doubleDoubleNeed: e.target.value })
+                        )
+                      }
+                      className="w-20 text-[16px] border border-slate-200 rounded-lg px-2 py-1.5 text-center bg-white"
+                    />
+                    <span className="text-xs text-slate-500 font-bold">項達標</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <label className="text-xs font-bold text-slate-600 w-28 shrink-0">大三元</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={3}
+                      value={draftMilestoneRules.tripleDoubleNeed}
+                      onChange={(e) =>
+                        setDraftMilestoneRules((p) =>
+                          normalizeMilestoneRules({ ...p, tripleDoubleNeed: e.target.value })
+                        )
+                      }
+                      className="w-20 text-[16px] border border-slate-200 rounded-lg px-2 py-1.5 text-center bg-white"
+                    />
+                    <span className="text-xs text-slate-500 font-bold">項達標</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+                    會套用到首頁加成、連續大三元、Stats 累積計數。
+                  </p>
+                </div>
                 {(['contacts', 'gatherings', 'strangers']).map((key) => (
                   <div key={key} className="flex gap-2 items-center mb-2 last:mb-0">
                     <input
@@ -2725,6 +2807,79 @@ function AppInner() {
           </div>
         )}
 
+        {/* --- 今日比賽：連線酷炫特效 --- */}
+        {showLineFx && (
+          <div
+            className="fixed inset-0 z-[215] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm px-6 pt-safe pb-safe"
+            onClick={() => setShowLineFx(false)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setShowLineFx(false);
+            }}
+          >
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.25),transparent_55%)]" />
+              <div className="absolute inset-0 anim-line-sweep opacity-80" />
+              <svg className="absolute inset-0 w-full h-full opacity-80" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="ln" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stopColor="rgba(56,189,248,0)" />
+                    <stop offset="0.5" stopColor="rgba(56,189,248,0.95)" />
+                    <stop offset="1" stopColor="rgba(56,189,248,0)" />
+                  </linearGradient>
+                </defs>
+                <line x1="10" y1="25" x2="90" y2="25" stroke="url(#ln)" strokeWidth="2.8" className="anim-neon-pop" />
+                <line x1="10" y1="50" x2="90" y2="50" stroke="url(#ln)" strokeWidth="2.8" className="anim-neon-pop" />
+                <line x1="10" y1="75" x2="90" y2="75" stroke="url(#ln)" strokeWidth="2.8" className="anim-neon-pop" />
+              </svg>
+            </div>
+            <div className="relative z-10 w-full max-w-md text-center">
+              <p className="text-3xl font-black text-white drop-shadow-[0_0_22px_rgba(56,189,248,0.55)] anim-burst-pop">
+                {lineFxText || '連線！'}
+              </p>
+              <p className="mt-3 text-xs text-white/80 font-bold">點一下即可關閉</p>
+            </div>
+          </div>
+        )}
+
+        {/* --- 今日比賽數據：Double Double / 大三元酷炫特效 --- */}
+        {milestoneFx && (
+          <div
+            className="fixed inset-0 z-[218] flex items-center justify-center bg-slate-950/80 backdrop-blur-md px-6 pt-safe pb-safe"
+            onClick={() => setMilestoneFx(null)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setMilestoneFx(null);
+            }}
+          >
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              {milestoneFx === 'dd' ? (
+                <>
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.22),transparent_60%)]" />
+                  <div className="absolute inset-0 anim-dd-pulse" />
+                </>
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(251,191,36,0.25),transparent_60%)]" />
+                  <div className="absolute inset-0 anim-td-nova" />
+                </>
+              )}
+            </div>
+            <div className="relative z-10 w-full max-w-md text-center">
+              <p
+                className={`text-3xl font-black text-white drop-shadow-[0_0_26px_rgba(251,191,36,0.55)] ${
+                  milestoneFx === 'dd' ? 'anim-burst-pop' : 'anim-td-pop'
+                }`}
+              >
+                {milestoneFx === 'dd' ? 'Double Double！' : '大三元！'}
+              </p>
+              <p className="mt-3 text-xs text-white/80 font-bold">點一下即可關閉</p>
+            </div>
+          </div>
+        )}
+
         {/* --- 統一風格確認視窗 --- */}
         {confirmModal.open && (
           <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-900/55 backdrop-blur-sm px-6 pt-safe pb-safe">
@@ -2792,6 +2947,59 @@ function AppInner() {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes burstPop {
+          0% { transform: scale(0.88); opacity: 0; filter: blur(1px); }
+          40% { transform: scale(1.03); opacity: 1; filter: blur(0px); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .anim-burst-pop { animation: burstPop 420ms cubic-bezier(.2,.9,.2,1) both; }
+
+        @keyframes neonPop {
+          0% { opacity: 0; transform: scaleX(0.2); filter: blur(6px); }
+          35% { opacity: 1; transform: scaleX(1); filter: blur(0px); }
+          100% { opacity: 0.95; transform: scaleX(1); }
+        }
+        .anim-neon-pop { transform-origin: 50% 50%; animation: neonPop 520ms ease-out both; }
+
+        @keyframes lineSweep {
+          0% { transform: translateX(-60%); opacity: 0; }
+          15% { opacity: 1; }
+          100% { transform: translateX(60%); opacity: 0; }
+        }
+        .anim-line-sweep {
+          background: linear-gradient(90deg, transparent 0%, rgba(56,189,248,0.35) 40%, rgba(56,189,248,0.12) 60%, transparent 100%);
+          animation: lineSweep 900ms ease-in-out both;
+        }
+
+        @keyframes ddPulse {
+          0% { opacity: 0; transform: scale(0.95); }
+          20% { opacity: 1; }
+          60% { opacity: 0.85; transform: scale(1.03); }
+          100% { opacity: 0; transform: scale(1.08); }
+        }
+        .anim-dd-pulse {
+          background: radial-gradient(circle at 50% 50%, rgba(34,197,94,0.35), transparent 60%);
+          animation: ddPulse 1100ms ease-out both;
+        }
+
+        @keyframes tdNova {
+          0% { opacity: 0; transform: scale(0.9) rotate(0deg); filter: blur(8px); }
+          30% { opacity: 1; filter: blur(0px); }
+          100% { opacity: 0; transform: scale(1.25) rotate(25deg); }
+        }
+        .anim-td-nova {
+          background:
+            conic-gradient(from 180deg, rgba(251,191,36,0.0), rgba(251,191,36,0.35), rgba(251,191,36,0.0)),
+            radial-gradient(circle at 50% 50%, rgba(251,191,36,0.25), transparent 60%);
+          animation: tdNova 1200ms ease-out both;
+        }
+
+        @keyframes tdPop {
+          0% { transform: scale(0.82); opacity: 0; }
+          55% { transform: scale(1.06); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .anim-td-pop { animation: tdPop 520ms cubic-bezier(.16,1,.3,1) both; }
         @keyframes floatTextUp {
           0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); }
           50% { opacity: 1; transform: translate(-50%, -25px) scale(1.1); }
