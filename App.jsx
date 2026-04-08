@@ -858,6 +858,7 @@ function AppInner() {
   const isLongPress = useRef(false);
   const historyPressTimer = useRef(null);
   const historyIsLongPress = useRef(false);
+  const updateNotifiedRef = useRef(false);
   const lastPlayDateRef = useRef(INITIAL_GAME.lastPlayDate);
   const settlementTimeRef = useRef(INITIAL_GAME.settlementTime);
   const gridStateRef = useRef(INITIAL_GAME.gridState);
@@ -918,6 +919,45 @@ function AppInner() {
   useEffect(() => {
     return () => {
       if (guidanceDrawTimerRef.current) clearTimeout(guidanceDrawTimerRef.current);
+    };
+  }, []);
+
+  // --- 自動偵測線上新版本（避免快取導致看不到更新）---
+  useEffect(() => {
+    const localBuildTime = typeof __BUILD_TIME__ === 'string' ? __BUILD_TIME__ : '';
+    if (!localBuildTime) return;
+
+    const check = async () => {
+      if (updateNotifiedRef.current) return;
+      try {
+        const res = await fetch(`/version.json?ts=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const remote = await res.json();
+        const remoteBuildTime = typeof remote?.buildTime === 'string' ? remote.buildTime : '';
+        if (!remoteBuildTime) return;
+        if (remoteBuildTime !== localBuildTime) {
+          updateNotifiedRef.current = true;
+          openConfirm({
+            title: '有新版本更新',
+            message: '已發布新版內容，重新整理即可套用最新版。',
+            confirmText: '重新整理',
+            cancelText: '稍後',
+            onConfirm: () => {
+              closeConfirm();
+              window.location.reload();
+            },
+          });
+        }
+      } catch {
+        // 忽略離線/阻擋等狀況
+      }
+    };
+
+    const t0 = setTimeout(check, 2500);
+    const it = setInterval(check, 60000);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(it);
     };
   }, []);
 
