@@ -841,9 +841,9 @@ function AppInner() {
   const [recentExpGain, setRecentExpGain] = useState(0);
   const [failureQuote, setFailureQuote] = useState("");
   const [pendingCelebrate, setPendingCelebrate] = useState(null);
-  const [showLineFx, setShowLineFx] = useState(false);
-  const [lineFxText, setLineFxText] = useState('');
-  const [milestoneFx, setMilestoneFx] = useState(null); // 'dd' | 'td' | null
+  const [lineFxCells, setLineFxCells] = useState([]); // number[]
+  const [bingoWinFx, setBingoWinFx] = useState(false);
+  const [statsMilestoneFx, setStatsMilestoneFx] = useState(null); // 'dd' | 'td' | null
   const [editingFailureId, setEditingFailureId] = useState(null);
   const [draftFailureDateTime, setDraftFailureDateTime] = useState('');
 
@@ -898,7 +898,9 @@ function AppInner() {
   const historyPressTimer = useRef(null);
   const historyIsLongPress = useRef(false);
   const lineFxTimerRef = useRef(null);
-  const milestoneFxTimerRef = useRef(null);
+  const winFxTimerRef = useRef(null);
+  const statsFxTimerRef = useRef(null);
+  const prevCompletedLineKeysRef = useRef(new Set());
   const updateNotifiedRef = useRef(false);
   const lastPlayDateRef = useRef(INITIAL_GAME.lastPlayDate);
   const settlementTimeRef = useRef(INITIAL_GAME.settlementTime);
@@ -1196,21 +1198,33 @@ function AppInner() {
   }, [showCelebrate]);
 
   useEffect(() => {
-    if (bingoStats.completedLines > prevLines) {
-      const diff = bingoStats.completedLines - prevLines;
+    // 找出「這次新完成」的連線，並只對該三格顯示電流外框特效
+    const currentKeys = new Set();
+    const newCells = new Set();
+    WIN_LINES.forEach((line) => {
+      if (gridState[line[0]] && gridState[line[1]] && gridState[line[2]]) {
+        const key = line.join('-');
+        currentKeys.add(key);
+        if (!prevCompletedLineKeysRef.current.has(key)) {
+          line.forEach((idx) => newCells.add(idx));
+        }
+      }
+    });
+
+    // 更新 prev set
+    prevCompletedLineKeysRef.current = currentKeys;
+
+    if (newCells.size > 0) {
+      const diff = Math.max(1, newCells.size / 3);
       addFloatingText(window.innerWidth / 2, window.innerHeight * 0.35, `連線！ +${diff * 3} EXP`, 'line');
-      setLineFxText(`連線！ +${diff * 3} EXP`);
-      setShowLineFx(true);
+      setLineFxCells([...newCells]);
       if (lineFxTimerRef.current) clearTimeout(lineFxTimerRef.current);
       lineFxTimerRef.current = setTimeout(() => {
-        setShowLineFx(false);
+        setLineFxCells([]);
         lineFxTimerRef.current = null;
-      }, 1100);
-      setPrevLines(bingoStats.completedLines);
-    } else if (bingoStats.completedLines < prevLines) {
-      setPrevLines(bingoStats.completedLines);
+      }, 900);
     }
-  }, [bingoStats.completedLines, prevLines]);
+  }, [gridState]);
 
   const businessStats = useMemo(() => {
     const allRecords = [...businessRecords, todayStats];
@@ -1283,6 +1297,14 @@ function AppInner() {
       
       setShowFullWinAnim(true);
       setTimeout(() => setShowFullWinAnim(false), 3000);
+
+      // 九宮格全完成：對整個九宮格外框跑更強的電流特效
+      setBingoWinFx(true);
+      if (winFxTimerRef.current) clearTimeout(winFxTimerRef.current);
+      winFxTimerRef.current = setTimeout(() => {
+        setBingoWinFx(false);
+        winFxTimerRef.current = null;
+      }, 1200);
       
       const bonus = getStreakMilestoneBonus(newStreak);
       lastWinMilestoneBonusRef.current = bonus;
@@ -1412,20 +1434,20 @@ function AppInner() {
     }
 
     if (!prevRewards.doubleDouble && newRewards.doubleDouble) {
-      setMilestoneFx('dd');
-      if (milestoneFxTimerRef.current) clearTimeout(milestoneFxTimerRef.current);
-      milestoneFxTimerRef.current = setTimeout(() => {
-        setMilestoneFx(null);
-        milestoneFxTimerRef.current = null;
-      }, 1300);
+      setStatsMilestoneFx('dd');
+      if (statsFxTimerRef.current) clearTimeout(statsFxTimerRef.current);
+      statsFxTimerRef.current = setTimeout(() => {
+        setStatsMilestoneFx(null);
+        statsFxTimerRef.current = null;
+      }, 1100);
     }
     if (!prevRewards.all && newRewards.all) {
-      setMilestoneFx('td');
-      if (milestoneFxTimerRef.current) clearTimeout(milestoneFxTimerRef.current);
-      milestoneFxTimerRef.current = setTimeout(() => {
-        setMilestoneFx(null);
-        milestoneFxTimerRef.current = null;
-      }, 1500);
+      setStatsMilestoneFx('td');
+      if (statsFxTimerRef.current) clearTimeout(statsFxTimerRef.current);
+      statsFxTimerRef.current = setTimeout(() => {
+        setStatsMilestoneFx(null);
+        statsFxTimerRef.current = null;
+      }, 1200);
     }
 
     animTexts.forEach((anim, idx) => {
@@ -1698,11 +1720,23 @@ function AppInner() {
         </div>
 
         {/* --- 今日比賽數據區塊 --- */}
-        <div className={`relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3 ${tdHeat ? `heat-card heat-${tdHeat}` : ''}`}>
+        <div
+          className={`relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3 ${tdHeat ? `heat-card heat-${tdHeat}` : ''} ${
+            statsMilestoneFx ? 'fx-stats-milestone' : ''
+          }`}
+        >
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.35] bg-[linear-gradient(rgba(99,102,241,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.06)_1px,transparent_1px)] bg-[length:14px_14px]"
             aria-hidden
           />
+          {statsMilestoneFx && (
+            <div
+              className={`pointer-events-none absolute inset-0 ${
+                statsMilestoneFx === 'dd' ? 'fx-dd-burst' : 'fx-td-burst'
+              }`}
+              aria-hidden
+            />
+          )}
           {tdHeat > 0 && (
             <>
               <div className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-orange-200/70 blur-3xl" aria-hidden />
@@ -1725,11 +1759,11 @@ function AppInner() {
            {(statRewards.all || statRewards.doubleDouble) && (
              <div className="relative z-10 mb-2 mt-1 animate-fadeIn">
                 {statRewards.all ? (
-                  <p className="text-amber-600 text-sm font-bold flex items-center justify-center gap-1 bg-amber-50 py-1.5 rounded-lg border border-amber-100">
+                  <p className={`text-amber-600 text-sm font-bold flex items-center justify-center gap-1 bg-amber-50 py-1.5 rounded-lg border border-amber-100 ${statsMilestoneFx === 'td' ? 'fx-badge-pop-td' : ''}`}>
                     <Sparkles size={16} /> 大三元達成！
                   </p>
                 ) : (
-                  <p className="text-blue-600 text-sm font-bold flex items-center justify-center gap-1 bg-blue-50 py-1.5 rounded-lg border border-blue-100">
+                  <p className={`text-blue-600 text-sm font-bold flex items-center justify-center gap-1 bg-blue-50 py-1.5 rounded-lg border border-blue-100 ${statsMilestoneFx === 'dd' ? 'fx-badge-pop-dd' : ''}`}>
                     <Zap size={16} /> Double Double!
                   </p>
                 )}
@@ -1805,13 +1839,15 @@ function AppInner() {
             </div>
           )}
 
-          <div className="relative z-10 grid grid-cols-3 gap-2 md:gap-3 mt-1">
+          <div className={`relative z-10 mt-1 rounded-[1.25rem] p-1.5 ${bingoWinFx ? 'fx-bingo-win-frame' : ''}`}>
+            <div className="grid grid-cols-3 gap-2 md:gap-3">
             {habits.map((habit, index) => (
               <div 
                 key={index}
                 onClick={(e) => toggleGrid(index, e)}
                 className={`
                   relative aspect-square rounded-2xl flex items-center justify-center p-2 text-center transition-all duration-300 cursor-pointer select-none
+                  ${lineFxCells.includes(index) ? 'fx-line-cell' : ''}
                   ${gridState[index] 
                     ? 'bg-indigo-50 text-indigo-700 border-2 border-indigo-300 shadow-sm scale-95' 
                     : 'bg-gray-50 md:hover:bg-indigo-50 text-gray-700 border border-gray-100'}
@@ -1829,6 +1865,7 @@ function AppInner() {
                 </>
               </div>
             ))}
+            </div>
           </div>
         </div>
       </div>
@@ -2825,78 +2862,7 @@ function AppInner() {
           </div>
         )}
 
-        {/* --- 今日比賽：連線酷炫特效 --- */}
-        {showLineFx && (
-          <div
-            className="fixed inset-0 z-[215] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm px-6 pt-safe pb-safe"
-            onClick={() => setShowLineFx(false)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') setShowLineFx(false);
-            }}
-          >
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.25),transparent_55%)]" />
-              <div className="absolute inset-0 anim-line-sweep opacity-80" />
-              <svg className="absolute inset-0 w-full h-full opacity-80" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="ln" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0" stopColor="rgba(56,189,248,0)" />
-                    <stop offset="0.5" stopColor="rgba(56,189,248,0.95)" />
-                    <stop offset="1" stopColor="rgba(56,189,248,0)" />
-                  </linearGradient>
-                </defs>
-                <line x1="10" y1="25" x2="90" y2="25" stroke="url(#ln)" strokeWidth="2.8" className="anim-neon-pop" />
-                <line x1="10" y1="50" x2="90" y2="50" stroke="url(#ln)" strokeWidth="2.8" className="anim-neon-pop" />
-                <line x1="10" y1="75" x2="90" y2="75" stroke="url(#ln)" strokeWidth="2.8" className="anim-neon-pop" />
-              </svg>
-            </div>
-            <div className="relative z-10 w-full max-w-md text-center">
-              <p className="text-3xl font-black text-white drop-shadow-[0_0_22px_rgba(56,189,248,0.55)] anim-burst-pop">
-                {lineFxText || '連線！'}
-              </p>
-              <p className="mt-3 text-xs text-white/80 font-bold">點一下即可關閉</p>
-            </div>
-          </div>
-        )}
-
-        {/* --- 今日比賽數據：Double Double / 大三元酷炫特效 --- */}
-        {milestoneFx && (
-          <div
-            className="fixed inset-0 z-[218] flex items-center justify-center bg-slate-950/80 backdrop-blur-md px-6 pt-safe pb-safe"
-            onClick={() => setMilestoneFx(null)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') setMilestoneFx(null);
-            }}
-          >
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              {milestoneFx === 'dd' ? (
-                <>
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.22),transparent_60%)]" />
-                  <div className="absolute inset-0 anim-dd-pulse" />
-                </>
-              ) : (
-                <>
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(251,191,36,0.25),transparent_60%)]" />
-                  <div className="absolute inset-0 anim-td-nova" />
-                </>
-              )}
-            </div>
-            <div className="relative z-10 w-full max-w-md text-center">
-              <p
-                className={`text-3xl font-black text-white drop-shadow-[0_0_26px_rgba(251,191,36,0.55)] ${
-                  milestoneFx === 'dd' ? 'anim-burst-pop' : 'anim-td-pop'
-                }`}
-              >
-                {milestoneFx === 'dd' ? 'Double Double！' : '大三元！'}
-              </p>
-              <p className="mt-3 text-xs text-white/80 font-bold">點一下即可關閉</p>
-            </div>
-          </div>
-        )}
+        {/* 連線 / 里程碑特效已改為局部（不滿版） */}
 
         {/* --- 統一風格確認視窗 --- */}
         {confirmModal.open && (
@@ -3018,6 +2984,96 @@ function AppInner() {
           100% { transform: scale(1); opacity: 1; }
         }
         .anim-td-pop { animation: tdPop 520ms cubic-bezier(.16,1,.3,1) both; }
+        @keyframes electricTrace {
+          0% { opacity: 0; filter: blur(6px); transform: scale(0.96); }
+          18% { opacity: 1; filter: blur(0px); transform: scale(1); }
+          100% { opacity: 0; filter: blur(6px); transform: scale(1.01); }
+        }
+        .fx-line-cell {
+          position: relative;
+          box-shadow: 0 0 0 0 rgba(56,189,248,0);
+        }
+        .fx-line-cell::after {
+          content: "";
+          position: absolute;
+          inset: -3px;
+          border-radius: 1.1rem;
+          pointer-events: none;
+          background:
+            conic-gradient(from 180deg,
+              rgba(56,189,248,0) 0%,
+              rgba(56,189,248,0.95) 10%,
+              rgba(56,189,248,0) 22%,
+              rgba(56,189,248,0.85) 35%,
+              rgba(56,189,248,0) 48%,
+              rgba(56,189,248,0.9) 60%,
+              rgba(56,189,248,0) 72%,
+              rgba(56,189,248,0.95) 86%,
+              rgba(56,189,248,0) 100%);
+          mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+          -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+          padding: 2px;
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          animation: electricTrace 900ms ease-out both;
+          box-shadow: 0 0 26px rgba(56,189,248,0.25);
+        }
+
+        @keyframes bingoFrame {
+          0% { opacity: 0; filter: blur(10px); transform: scale(0.985); }
+          25% { opacity: 1; filter: blur(0px); transform: scale(1); }
+          100% { opacity: 0; filter: blur(10px); transform: scale(1.01); }
+        }
+        .fx-bingo-win-frame {
+          position: relative;
+        }
+        .fx-bingo-win-frame::after {
+          content: "";
+          position: absolute;
+          inset: -6px;
+          border-radius: 1.65rem;
+          pointer-events: none;
+          background:
+            conic-gradient(from 120deg,
+              rgba(251,191,36,0) 0%,
+              rgba(251,191,36,0.95) 12%,
+              rgba(56,189,248,0.9) 22%,
+              rgba(251,191,36,0) 34%,
+              rgba(255,255,255,0.85) 45%,
+              rgba(56,189,248,0) 60%,
+              rgba(251,191,36,0.95) 78%,
+              rgba(251,191,36,0) 100%);
+          mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+          -webkit-mask: linear-gradient(#000, #000) content-box, linear-gradient(#000, #000);
+          padding: 3px;
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          animation: bingoFrame 1200ms cubic-bezier(.16,1,.3,1) both;
+          box-shadow: 0 0 40px rgba(251,191,36,0.22), 0 0 28px rgba(56,189,248,0.14);
+        }
+
+        @keyframes statsBurst {
+          0% { opacity: 0; transform: scale(0.985); filter: blur(10px); }
+          22% { opacity: 1; transform: scale(1); filter: blur(0px); }
+          100% { opacity: 0; transform: scale(1.01); filter: blur(10px); }
+        }
+        .fx-stats-milestone { position: relative; }
+        .fx-dd-burst {
+          background:
+            radial-gradient(circle at 20% 30%, rgba(34,197,94,0.28), transparent 50%),
+            radial-gradient(circle at 80% 65%, rgba(56,189,248,0.18), transparent 55%),
+            conic-gradient(from 180deg, rgba(34,197,94,0), rgba(34,197,94,0.22), rgba(34,197,94,0));
+          animation: statsBurst 1050ms ease-out both;
+        }
+        .fx-td-burst {
+          background:
+            radial-gradient(circle at 30% 35%, rgba(251,191,36,0.28), transparent 55%),
+            radial-gradient(circle at 75% 60%, rgba(255,255,255,0.16), transparent 55%),
+            conic-gradient(from 160deg, rgba(251,191,36,0), rgba(251,191,36,0.26), rgba(251,191,36,0));
+          animation: statsBurst 1150ms ease-out both;
+        }
+        .fx-badge-pop-dd { animation: burstPop 420ms cubic-bezier(.2,.9,.2,1) both; }
+        .fx-badge-pop-td { animation: tdPop 520ms cubic-bezier(.16,1,.3,1) both; }
         @keyframes floatTextUp {
           0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); }
           50% { opacity: 1; transform: translate(-50%, -25px) scale(1.1); }
