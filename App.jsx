@@ -345,7 +345,7 @@ const getStyleByTitle = (title) => {
 
 // --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
 const STORAGE_KEY = 'road-to-diamond-game-v1';
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 
 const DEFAULT_SETTLEMENT_TIME = { hour: 4, minute: 0 };
 
@@ -727,9 +727,21 @@ function loadPersistedGameState() {
 
     const settled = settleGameDaysBetween(rawSaved, targetGameDay);
 
+    // v4 以前可能出現「連勝已累加，但本季勝場未同步入帳」造成 wins < streak 的不合理狀態。
+    // 由於 streak 本質上是連續勝場數，因此 wins 不應小於 streak；此處做一次性修復。
+    let fixedSeasonRecord = settled.seasonRecord;
+    if (fileVersion <= 4) {
+      const wins = Number(settled.seasonRecord?.wins) || 0;
+      const losses = Number(settled.seasonRecord?.losses) || 0;
+      const st = Number(settled.streak) || 0;
+      if (st > wins) {
+        fixedSeasonRecord = { wins: st, losses };
+      }
+    }
+
     return {
       baseExp: typeof d.baseExp === 'number' && d.baseExp >= 0 ? d.baseExp : 0,
-      seasonRecord: settled.seasonRecord,
+      seasonRecord: fixedSeasonRecord,
       habits,
       gridState: settled.gridState,
       streak: settled.streak,
