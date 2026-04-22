@@ -345,7 +345,7 @@ const getStyleByTitle = (title) => {
 
 // --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
 const STORAGE_KEY = 'road-to-diamond-game-v1';
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
 
 const DEFAULT_SETTLEMENT_TIME = { hour: 4, minute: 0 };
 
@@ -474,7 +474,7 @@ const DEFAULT_STAT_REWARDS = {
   all: false,
 };
 
-function settleGameDaysBetween(saved, targetGameDay) {
+function settleGameDaysBetween(saved, targetGameDay, statTargets, milestoneRules) {
   let lp = saved.lastPlayDate || targetGameDay;
   let gridState = Array.isArray(saved.gridState) && saved.gridState.length === 9
     ? [...saved.gridState.map(Boolean)]
@@ -494,17 +494,50 @@ function settleGameDaysBetween(saved, targetGameDay) {
     typeof saved.tripleDoubleStreak === 'number' && saved.tripleDoubleStreak >= 0
       ? saved.tripleDoubleStreak
       : 0;
+  let baseExp = typeof saved.baseExp === 'number' && saved.baseExp >= 0 ? saved.baseExp : 0;
   let guidanceDaily = saved.guidanceDaily;
+
+  // 大三元門檻 & 達標目標（結算當日是否達成大三元用）
+  const tdNeed = Math.max(
+    1,
+    Math.min(3, Number(milestoneRules?.tripleDoubleNeed) || DEFAULT_MILESTONE_RULES.tripleDoubleNeed)
+  );
+  const targets = {
+    contacts: Number(statTargets?.contacts?.target) || DEFAULT_STAT_TARGETS.contacts.target,
+    gatherings: Number(statTargets?.gatherings?.target) || DEFAULT_STAT_TARGETS.gatherings.target,
+    strangers: Number(statTargets?.strangers?.target) || DEFAULT_STAT_TARGETS.strangers.target,
+  };
+
+  const calcGridExp = (g) => {
+    if (!Array.isArray(g) || g.length !== 9) return 0;
+    const stars = g.filter(Boolean).length;
+    let lines = 0;
+    WIN_LINES.forEach((line) => {
+      if (g[line[0]] && g[line[1]] && g[line[2]]) lines += 1;
+    });
+    const isWin = stars === 9;
+    return stars * 1 + lines * 3 + (isWin ? 5 : 0);
+  };
+
+  const isTripleDoubleDay = (ts) => {
+    const c = (Number(ts?.contacts) || 0) >= targets.contacts;
+    const g = (Number(ts?.gatherings) || 0) >= targets.gatherings;
+    const s = (Number(ts?.strangers) || 0) >= targets.strangers;
+    const count = [c, g, s].filter(Boolean).length;
+    return count >= tdNeed;
+  };
 
   if (compareDayKeys(lp, targetGameDay) > 0) {
     return {
       ...saved,
+      baseExp,
       lastPlayDate: targetGameDay,
       gridState,
       todayStats,
       businessRecords,
       seasonRecord,
       streak,
+      tripleDoubleStreak,
       statRewards: { ...DEFAULT_STAT_REWARDS, ...saved.statRewards },
       guidanceDaily:
         guidanceDaily?.dayKey === targetGameDay && Array.isArray(guidanceDaily?.draws)
@@ -517,16 +550,29 @@ function settleGameDaysBetween(saved, targetGameDay) {
   while (compareDayKeys(lp, targetGameDay) < 0) {
     crossed = true;
     const win = gridState.length === 9 && gridState.every(Boolean);
+
+    // 入帳：當日九宮格未結算的 EXP（stars + lines×3 + 完勝×5）
+    baseExp += calcGridExp(gridState);
+
     businessRecords = upsertBusinessRecord(businessRecords, lp, todayStats);
     seasonRecord = {
       wins: seasonRecord.wins + (win ? 1 : 0),
       losses: seasonRecord.losses + (win ? 0 : 1),
     };
+
+    // 連勝：沒贏歸零
     if (!win) streak = 0;
+
+    // 連續大三元：依當日 todayStats 決定累加或歸零
+    if (isTripleDoubleDay(todayStats)) {
+      tripleDoubleStreak += 1;
+    } else {
+      tripleDoubleStreak = 0;
+    }
+
     lp = getNextGameDayKey(lp);
     gridState = Array(9).fill(false);
     todayStats = { contacts: 0, gatherings: 0, strangers: 0 };
-    tripleDoubleStreak = 0;
   }
 
   if (crossed) {
@@ -541,6 +587,7 @@ function settleGameDaysBetween(saved, targetGameDay) {
 
   return {
     ...saved,
+    baseExp,
     lastPlayDate: targetGameDay,
     gridState,
     todayStats,
@@ -550,7 +597,7 @@ function settleGameDaysBetween(saved, targetGameDay) {
     hasWonToday: crossed ? false : !!saved.hasWonToday,
     hasPerfectDayToday: crossed ? false : !!saved.hasPerfectDayToday,
     statRewards: crossed ? { ...DEFAULT_STAT_REWARDS } : { ...DEFAULT_STAT_REWARDS, ...saved.statRewards },
-    tripleDoubleStreak: crossed ? 0 : tripleDoubleStreak,
+    tripleDoubleStreak,
     guidanceDaily,
   };
 }
@@ -707,6 +754,7 @@ function loadPersistedGameState() {
     }
 
     const rawSaved = {
+      baseExp: typeof d.baseExp === 'number' && d.baseExp >= 0 ? d.baseExp : 0,
       lastPlayDate: lastPlayDateLegacy,
       gridState:
         Array.isArray(d.gridState) && d.gridState.length === 9
@@ -742,7 +790,16 @@ function loadPersistedGameState() {
       guidanceDaily: d.guidanceDaily,
     };
 
-    const settled = settleGameDaysBetween(rawSaved, targetGameDay);
+    // v5 以前：跨日結算時未把九宮格 EXP 入帳；對歷史完勝日一次性補 38 EXP/場。
+    // 完勝日固定 = 9 星 + 8 條連線×3 + 完勝 5 = 38 EXP
+    // 非完勝日因 gridState 未逐日保存，無法回推，故不補。
+    if (fileVersion <= 5) {
+      const histWins = Number(rawSaved.seasonRecord?.wins) || 0;
+      const PERFECT_GRID_EXP = 38;
+      rawSaved.baseExp = (Number(rawSaved.baseExp) || 0) + histWins * PERFECT_GRID_EXP;
+    }
+
+    const settled = settleGameDaysBetween(rawSaved, targetGameDay, statTargets, milestoneRules);
 
     // v4 以前可能出現「連勝已累加，但本季勝場未同步入帳」造成 wins < streak 的不合理狀態。
     // 由於 streak 本質上是連續勝場數，因此 wins 不應小於 streak；此處做一次性修復。
@@ -757,7 +814,7 @@ function loadPersistedGameState() {
     }
 
     return {
-      baseExp: typeof d.baseExp === 'number' && d.baseExp >= 0 ? d.baseExp : 0,
+      baseExp: settled.baseExp,
       seasonRecord: fixedSeasonRecord,
       habits,
       gridState: settled.gridState,
@@ -914,6 +971,9 @@ function AppInner() {
   const hasPerfectDayTodayRef = useRef(INITIAL_GAME.hasPerfectDayToday);
   const statRewardsRef = useRef(INITIAL_GAME.statRewards);
   const guidanceDailyRef = useRef(INITIAL_GAME.guidanceDaily);
+  const baseExpRef = useRef(INITIAL_GAME.baseExp);
+  const statTargetsRef = useRef(INITIAL_GAME.statTargets);
+  const milestoneRulesRef = useRef(INITIAL_GAME.milestoneRules);
   const lastWinMilestoneBonusRef = useRef(0);
 
   // --- Animation State ---
@@ -957,6 +1017,9 @@ function AppInner() {
     statRewardsRef.current = statRewards;
     guidanceDailyRef.current = guidanceDaily;
     settlementTimeRef.current = settlementTime;
+    baseExpRef.current = baseExp;
+    statTargetsRef.current = statTargets;
+    milestoneRulesRef.current = milestoneRules;
   });
 
   useEffect(() => {
@@ -1058,6 +1121,7 @@ function AppInner() {
       const target = getGameDayKey(new Date(), settlementTimeRef.current);
       if (lastPlayDateRef.current === target) return;
       const snap = {
+        baseExp: baseExpRef.current,
         lastPlayDate: lastPlayDateRef.current,
         gridState: gridStateRef.current,
         todayStats: todayStatsRef.current,
@@ -1070,7 +1134,12 @@ function AppInner() {
         statRewards: statRewardsRef.current,
         guidanceDaily: guidanceDailyRef.current,
       };
-      const settled = settleGameDaysBetween(snap, target);
+      const settled = settleGameDaysBetween(
+        snap,
+        target,
+        statTargetsRef.current,
+        milestoneRulesRef.current
+      );
       setBusinessRecords(settled.businessRecords);
       setSeasonRecord(settled.seasonRecord);
       setStreak(settled.streak);
@@ -1081,6 +1150,7 @@ function AppInner() {
       setStatRewards(settled.statRewards);
       setTripleDoubleStreak(settled.tripleDoubleStreak);
       setGuidanceDaily(settled.guidanceDaily);
+      setBaseExp(settled.baseExp);
       setPrevLines(initialCompletedLineCount(settled.gridState));
       lastPlayDateRef.current = settled.lastPlayDate;
     };
@@ -2151,8 +2221,14 @@ function AppInner() {
             {[...businessRecords].reverse().map((record, index) => {
               const realIndex = businessRecords.length - 1 - index;
               const isEditing = editingBusinessRecordIndex === realIndex;
+              const { doubleDouble, tripleDouble } = getDayMilestones(record);
+              const cardStyle = tripleDouble
+                ? "bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-amber-300 shadow-amber-100"
+                : doubleDouble
+                ? "bg-amber-50 border border-amber-200"
+                : "bg-white border border-gray-50 md:hover:bg-blue-50/50";
               return (
-              <div key={realIndex} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex justify-between items-center md:hover:bg-blue-50/50 transition-colors">
+              <div key={realIndex} className={`p-4 rounded-2xl shadow-sm flex justify-between items-center transition-colors ${cardStyle}`}>
                 <span className="text-sm font-bold text-gray-500 w-24">{record.date}</span>
                 <div className="flex items-center gap-2 text-sm">
                   <span className="flex items-center gap-1 text-emerald-600">
