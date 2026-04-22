@@ -345,7 +345,7 @@ const getStyleByTitle = (title) => {
 
 // --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
 const STORAGE_KEY = 'road-to-diamond-game-v1';
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 
 const DEFAULT_SETTLEMENT_TIME = { hour: 4, minute: 0 };
 
@@ -797,6 +797,46 @@ function loadPersistedGameState() {
       const histWins = Number(rawSaved.seasonRecord?.wins) || 0;
       const PERFECT_GRID_EXP = 38;
       rawSaved.baseExp = (Number(rawSaved.baseExp) || 0) + histWins * PERFECT_GRID_EXP;
+    }
+
+    // v6 以前：舊版跨日會把 tripleDoubleStreak 歸零，導致昨天達大三元的連續場次流失。
+    // 依據 businessRecords 從「最新一筆之前的連續日期」往回掃，重建目前連續場次。
+    if (fileVersion <= 6) {
+      const tdNeed = Math.max(
+        1,
+        Math.min(3, Number(milestoneRules?.tripleDoubleNeed) || DEFAULT_MILESTONE_RULES.tripleDoubleNeed)
+      );
+      const tgt = {
+        contacts: Number(statTargets?.contacts?.target) || DEFAULT_STAT_TARGETS.contacts.target,
+        gatherings: Number(statTargets?.gatherings?.target) || DEFAULT_STAT_TARGETS.gatherings.target,
+        strangers: Number(statTargets?.strangers?.target) || DEFAULT_STAT_TARGETS.strangers.target,
+      };
+      const isTD = (r) => {
+        const c = (Number(r?.contacts) || 0) >= tgt.contacts;
+        const g = (Number(r?.gatherings) || 0) >= tgt.gatherings;
+        const s = (Number(r?.strangers) || 0) >= tgt.strangers;
+        return [c, g, s].filter(Boolean).length >= tdNeed;
+      };
+
+      // 以日期排序，從最後一筆往回回推連續大三元場次
+      const sorted = [...(rawSaved.businessRecords || [])].sort((a, b) =>
+        compareDayKeys(a.date, b.date)
+      );
+      let rebuilt = 0;
+      let expectedPrev = null;
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        const r = sorted[i];
+        // 連續性檢查：日期必須是期望的前一天（第一次除外）
+        if (expectedPrev && r.date !== expectedPrev) break;
+        if (!isTD(r)) break;
+        rebuilt += 1;
+        expectedPrev = getPrevGameDayKey(r.date);
+      }
+
+      // 只在「重建結果 > 既有值」時覆寫，避免覆蓋掉今天已累加的場次
+      if (rebuilt > (Number(rawSaved.tripleDoubleStreak) || 0)) {
+        rawSaved.tripleDoubleStreak = rebuilt;
+      }
     }
 
     const settled = settleGameDaysBetween(rawSaved, targetGameDay, statTargets, milestoneRules);
