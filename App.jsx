@@ -2665,6 +2665,7 @@ function AppInner() {
       <div className="space-y-5 animate-fadeIn pb-8">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           {sectionHeader('今日指引', 'guidance')}
+          <p className="text-xs text-slate-500 mb-2">「開始您的一天」會從這裡隨機抽一句。可新增、修改或刪除。</p>
           {settingsEditingSection === 'guidance' ? (
             <>
               <div className="max-h-[52vh] overflow-y-auto pr-1">
@@ -2709,7 +2710,35 @@ function AppInner() {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          {sectionHeader('打卡時間', 'checkin')}
+          <p className="text-xs text-slate-500 mb-2">
+            「開始您的一天」的目標時間。此時間前算準時，之後算遲到。
+          </p>
+          {settingsEditingSection === 'checkin' ? (
+            <>
+              <div className="max-h-[52vh] overflow-y-auto pr-1">
+                <input
+                  type="time"
+                  value={draftCheckInInputValue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const [hh, mm] = v.split(':').map(Number);
+                    setDraftCheckInTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
+                  }}
+                  className="text-[16px] border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
+                />
+              </div>
+              {editActions(saveCheckInSection)}
+            </>
+          ) : (
+            <div />
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
           {sectionHeader('學習紀錄', 'failures')}
+          <p className="text-xs text-slate-500 mb-2">失敗為成功之母，每次挫折都是一次學習，可自訂名稱、圖示、EXP。</p>
           {settingsEditingSection === 'failures' ? (
             <>
               <div className="max-h-[52vh] overflow-y-auto pr-1 space-y-3">
@@ -2813,6 +2842,7 @@ function AppInner() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           {sectionHeader('今日比賽', 'habits')}
+          <p className="text-xs text-slate-500 mb-2">想養成的 9 個原子習慣，賓果遊戲，全部完成代表今日比賽勝利。</p>
           {settingsEditingSection === 'habits' ? (
             <>
               <div className="max-h-[52vh] overflow-y-auto pr-1">
@@ -2842,48 +2872,10 @@ function AppInner() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           {sectionHeader('今日比賽數據', 'stats')}
-          <p className="text-xs text-slate-500 mb-3">首頁三格按鈕的顯示名稱與達標數字。</p>
+          <p className="text-xs text-slate-500 mb-3">每天想達成的三項目標及數量，例如聯絡人數-10 / 聚會場次-3 / 認識人數-1。</p>
           {settingsEditingSection === 'stats' ? (
             <>
               <div className="max-h-[52vh] overflow-y-auto pr-1">
-                <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-                  <p className="text-xs font-black text-slate-700 mb-2">里程碑條件</p>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-slate-600 w-28 shrink-0">Double Double</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={3}
-                      value={draftMilestoneRules.doubleDoubleNeed}
-                      onChange={(e) =>
-                        setDraftMilestoneRules((p) =>
-                          normalizeMilestoneRules({ ...p, doubleDoubleNeed: e.target.value })
-                        )
-                      }
-                      className="w-20 text-[16px] border border-slate-200 rounded-lg px-2 py-1.5 text-center bg-white"
-                    />
-                    <span className="text-xs text-slate-500 font-bold">項達標</span>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <label className="text-xs font-bold text-slate-600 w-28 shrink-0">大三元</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={3}
-                      value={draftMilestoneRules.tripleDoubleNeed}
-                      onChange={(e) =>
-                        setDraftMilestoneRules((p) =>
-                          normalizeMilestoneRules({ ...p, tripleDoubleNeed: e.target.value })
-                        )
-                      }
-                      className="w-20 text-[16px] border border-slate-200 rounded-lg px-2 py-1.5 text-center bg-white"
-                    />
-                    <span className="text-xs text-slate-500 font-bold">項達標</span>
-                  </div>
-                  <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-                    會套用到首頁加成、連續大三元、Stats 累積計數。
-                  </p>
-                </div>
                 {(['contacts', 'gatherings', 'strangers']).map((key) => (
                   <div key={key} className="flex gap-2 items-center mb-2 last:mb-0">
                     <input
@@ -2912,7 +2904,7 @@ function AppInner() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           {sectionHeader('每日結算時間', 'settlement')}
-          <p className="text-xs text-slate-500 mb-2">本地時間到點後切換遊戲日並結算。</p>
+          <p className="text-xs text-slate-500 mb-2">每天切換為「新的一天」的時間。建議設在睡覺後。</p>
           {settingsEditingSection === 'settlement' ? (
             <>
               <div className="max-h-[52vh] overflow-y-auto pr-1">
@@ -2929,35 +2921,6 @@ function AppInner() {
                 />
               </div>
               {editActions(saveSettlementSection)}
-            </>
-          ) : (
-            <div />
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          {sectionHeader('打卡時間', 'checkin')}
-          <p className="text-xs text-slate-500 mb-2">
-            目前：{String(checkInTime.hour).padStart(2, '0')}:{String(checkInTime.minute).padStart(2, '0')} 前打卡為準時。
-            <br />
-            準時打卡 +{CHECK_IN_BASE_EXP} EXP；連續 3 / 7 / 14 / 21 天額外 +10 / 20 / 30 / 50 EXP。
-          </p>
-          {settingsEditingSection === 'checkin' ? (
-            <>
-              <div className="max-h-[52vh] overflow-y-auto pr-1">
-                <input
-                  type="time"
-                  value={draftCheckInInputValue}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (!v) return;
-                    const [hh, mm] = v.split(':').map(Number);
-                    setDraftCheckInTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
-                  }}
-                  className="text-[16px] border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
-                />
-              </div>
-              {editActions(saveCheckInSection)}
             </>
           ) : (
             <div />
