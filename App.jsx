@@ -1821,6 +1821,8 @@ function AppInner() {
     const cardStyle = getStyleByTitle(currentTitle);
     const tdHeat = heatTier(tripleDoubleStreak);
     const winHeat = heatTier(streak);
+    const ciHeat = heatTier(checkInStreak);
+    const checkInDisplay = `${String(checkInTime.hour).padStart(2, '0')}:${String(checkInTime.minute).padStart(2, '0')}`;
 
     return (
       <div className="space-y-5 animate-fadeIn pb-6 relative">
@@ -1874,30 +1876,37 @@ function AppInner() {
         </div>
 
         {/* 今日指引（獨立匡格） */}
-        <div className="relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3">
-          <div
-            className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-100/80 blur-3xl"
-            aria-hidden
-          />
-          <div
-            className="pointer-events-none absolute -left-6 bottom-0 h-28 w-28 rounded-full bg-violet-100/60 blur-2xl"
-            aria-hidden
-          />
-          <div className="relative z-10 flex items-center justify-between gap-2">
+        <div className={`relative overflow-hidden bg-white rounded-3xl p-5 shadow-sm border border-indigo-50 flex flex-col gap-3 ${ciHeat ? `heat-card heat-${ciHeat}` : ''}`}>
+          {ciHeat === 0 && (
+            <>
+              <div
+                className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-100/80 blur-3xl"
+                aria-hidden
+              />
+              <div
+                className="pointer-events-none absolute -left-6 bottom-0 h-28 w-28 rounded-full bg-violet-100/60 blur-2xl"
+                aria-hidden
+              />
+            </>
+          )}
+          {ciHeat > 0 && (
+            <>
+              <div className="pointer-events-none absolute -top-16 -right-10 h-48 w-48 rounded-full bg-orange-200/70 blur-3xl" aria-hidden />
+              <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-amber-200/55 blur-3xl" aria-hidden />
+              <div className="pointer-events-none absolute inset-0 heat-flame" aria-hidden />
+            </>
+          )}
+          <div className="relative z-10 flex justify-between items-start gap-2">
             <div className="min-w-0">
-              <p className="text-xl font-bold text-gray-800">今日指引</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                連續準時打卡：<span className="font-bold text-indigo-600">{checkInStreak}</span> 天
-                <span className="ml-1 text-slate-400">
-                  （目標 {String(checkInTime.hour).padStart(2, '0')}:{String(checkInTime.minute).padStart(2, '0')} 前）
-                </span>
-              </p>
+              <h2 className="text-xl font-bold text-gray-800">今日指引</h2>
+              <p className="text-xs text-gray-500 mt-1">目標 {checkInDisplay} 前打卡</p>
             </div>
-            {guidanceRemainingToday > 0 && !guidanceDrawsToday.length && !guidanceDrawing && (
-              <span className="shrink-0 text-[10px] font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-100">
-                可打卡
+            <div className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-xl font-bold flex flex-col items-end shrink-0">
+              <span className="text-[10px] text-orange-400">連續準時打卡</span>
+              <span className="flex items-center gap-1 text-sm">
+                <Zap size={14} className="fill-orange-400 text-orange-400" /> {checkInStreak} 天
               </span>
-            )}
+            </div>
           </div>
 
           {guidanceDrawing ? (
