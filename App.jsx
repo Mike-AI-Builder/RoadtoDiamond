@@ -345,9 +345,27 @@ const getStyleByTitle = (title) => {
 
 // --- 本機儲存（每個瀏覽器各自一份，重新整理／關閉後再開仍保留）---
 const STORAGE_KEY = 'road-to-diamond-game-v1';
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 
 const DEFAULT_SETTLEMENT_TIME = { hour: 4, minute: 0 };
+const DEFAULT_CHECK_IN_TIME = { hour: 8, minute: 0 };
+
+const CHECK_IN_BASE_EXP = 3;
+const CHECK_IN_STREAK_BONUS = { 3: 10, 7: 20, 14: 30, 21: 50 };
+function getCheckInStreakBonus(n) {
+  return CHECK_IN_STREAK_BONUS[n] || 0;
+}
+
+const LATE_ENCOURAGEMENTS = [
+  '別緊張，現在開始也來得及！',
+  '一天的價值由你決定，加油！',
+  '遲到不是失敗，停下來才是。繼續前進吧！',
+  '錯過早晨還有整個白天，全力以赴！',
+  '今天的第一步比準時更重要，動起來！',
+  '昨天的你不能定義今天的你，加油！',
+  '時間會回應行動，現在就開始吧！',
+  '進度比速度重要，邁出這一步就贏了！',
+];
 
 const DEFAULT_MILESTONE_RULES = {
   // 三項數據中要達標幾項才算 Double Double / 大三元
@@ -386,6 +404,14 @@ function normalizeSettlementTime(t) {
   return {
     hour: Math.max(0, Math.min(23, Number(t.hour) ?? DEFAULT_SETTLEMENT_TIME.hour)),
     minute: Math.max(0, Math.min(59, Number(t.minute) ?? DEFAULT_SETTLEMENT_TIME.minute)),
+  };
+}
+
+function normalizeCheckInTime(t) {
+  if (!t || typeof t !== 'object') return { ...DEFAULT_CHECK_IN_TIME };
+  return {
+    hour: Math.max(0, Math.min(23, Number(t.hour) ?? DEFAULT_CHECK_IN_TIME.hour)),
+    minute: Math.max(0, Math.min(59, Number(t.minute) ?? DEFAULT_CHECK_IN_TIME.minute)),
   };
 }
 
@@ -707,6 +733,9 @@ function createFreshGameState() {
     statTargets: normalizeStatTargets(null),
     milestoneRules: { ...DEFAULT_MILESTONE_RULES },
     settlementTime: { ...DEFAULT_SETTLEMENT_TIME },
+    checkInTime: { ...DEFAULT_CHECK_IN_TIME },
+    checkInStreak: 0,
+    lastCheckInDate: '',
   };
 }
 
@@ -719,6 +748,11 @@ function loadPersistedGameState() {
     if (fileVersion > SAVE_VERSION) return null;
 
     const settlementTime = normalizeSettlementTime(d.settlementTime);
+    const checkInTime = normalizeCheckInTime(d.checkInTime);
+    const checkInStreak =
+      typeof d.checkInStreak === 'number' && d.checkInStreak >= 0 ? d.checkInStreak : 0;
+    const lastCheckInDate =
+      typeof d.lastCheckInDate === 'string' ? d.lastCheckInDate : '';
     const statTargets = normalizeStatTargets(d.statTargets);
     const milestoneRules = normalizeMilestoneRules(d.milestoneRules);
     const targetGameDay = getGameDayKey(new Date(), settlementTime);
@@ -873,6 +907,9 @@ function loadPersistedGameState() {
       statTargets,
       milestoneRules,
       settlementTime,
+      checkInTime,
+      checkInStreak,
+      lastCheckInDate,
     };
   } catch {
     return null;
@@ -969,6 +1006,9 @@ function AppInner() {
     normalizeMilestoneRules(INITIAL_GAME.milestoneRules)
   );
   const [settlementTime, setSettlementTime] = useState(INITIAL_GAME.settlementTime);
+  const [checkInTime, setCheckInTime] = useState(INITIAL_GAME.checkInTime);
+  const [checkInStreak, setCheckInStreak] = useState(INITIAL_GAME.checkInStreak);
+  const [lastCheckInDate, setLastCheckInDate] = useState(INITIAL_GAME.lastCheckInDate);
   const [iconPickerOpenId, setIconPickerOpenId] = useState(null);
 
   const [settingsEditingSection, setSettingsEditingSection] = useState(null);
@@ -984,6 +1024,9 @@ function AppInner() {
   );
   const [draftSettlementTime, setDraftSettlementTime] = useState(() => ({
     ...INITIAL_GAME.settlementTime,
+  }));
+  const [draftCheckInTime, setDraftCheckInTime] = useState(() => ({
+    ...INITIAL_GAME.checkInTime,
   }));
   const failuresListEndRef = useRef(null);
   const guidanceListEndRef = useRef(null);
@@ -1129,6 +1172,9 @@ function AppInner() {
       statTargets,
       milestoneRules,
       settlementTime,
+      checkInTime,
+      checkInStreak,
+      lastCheckInDate,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -1154,6 +1200,9 @@ function AppInner() {
     statTargets,
     milestoneRules,
     settlementTime,
+    checkInTime,
+    checkInStreak,
+    lastCheckInDate,
   ]);
 
   useEffect(() => {
@@ -1713,6 +1762,61 @@ function AppInner() {
     }, 1000);
   };
 
+  // 「開始您的一天」：判斷準時／遲到 → 結算 EXP / 連續打卡 → 抽指引
+  const handleStartYourDay = () => {
+    if (guidanceDrawing || guidanceDrawsToday.length > 0) return;
+
+    const today = getGameDayKey(new Date(), settlementTime);
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const cutoffMin =
+      (Number(checkInTime?.hour) || 0) * 60 + (Number(checkInTime?.minute) || 0);
+    const onTime = nowMin <= cutoffMin;
+
+    let resultMessage = '';
+
+    if (onTime) {
+      const yesterday = getPrevGameDayKey(today);
+      const newStreak = lastCheckInDate === yesterday ? checkInStreak + 1 : 1;
+      const milestoneBonus = getCheckInStreakBonus(newStreak);
+      const totalGain = CHECK_IN_BASE_EXP + milestoneBonus;
+
+      setCheckInStreak(newStreak);
+      setLastCheckInDate(today);
+      setBaseExp((prev) => prev + totalGain);
+
+      resultMessage =
+        milestoneBonus > 0
+          ? `準時打卡成功！\n連續 ${newStreak} 天 🎯\n+${CHECK_IN_BASE_EXP} EXP，里程碑額外 +${milestoneBonus} EXP！`
+          : `準時打卡成功！\n連續 ${newStreak} 天 🎯\n+${CHECK_IN_BASE_EXP} EXP`;
+    } else {
+      const lateMin = Math.max(0, nowMin - cutoffMin);
+      const hours = Math.floor(lateMin / 60);
+      const minutes = lateMin % 60;
+      const lateText =
+        hours > 0 ? `${hours} 小時 ${minutes} 分鐘` : `${minutes} 分鐘`;
+      const encouragement =
+        LATE_ENCOURAGEMENTS[Math.floor(Math.random() * LATE_ENCOURAGEMENTS.length)];
+
+      // 遲到視為打卡未連續：歸零，但仍記錄今天已嘗試打卡（避免明天又被當第一天）
+      setCheckInStreak(0);
+      setLastCheckInDate(today);
+
+      resultMessage = `今天遲到了 ${lateText}\n${encouragement}`;
+    }
+
+    setGuidanceDrawing(true);
+    if (guidanceDrawTimerRef.current) clearTimeout(guidanceDrawTimerRef.current);
+    guidanceDrawTimerRef.current = setTimeout(() => {
+      drawTodayGuidance();
+      setGuidanceDrawing(false);
+      setGuidanceRevealNonce((n) => n + 1);
+      guidanceDrawTimerRef.current = null;
+      // 抽完指引後再彈打卡結果，避免訊息蓋住動畫
+      setTimeout(() => alert(resultMessage), 600);
+    }, 1000);
+  };
+
   const renderHome = () => {
     const cardStyle = getStyleByTitle(currentTitle);
     const tdHeat = heatTier(tripleDoubleStreak);
@@ -1782,10 +1886,16 @@ function AppInner() {
           <div className="relative z-10 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-xl font-bold text-gray-800">今日指引</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                連續準時打卡：<span className="font-bold text-indigo-600">{checkInStreak}</span> 天
+                <span className="ml-1 text-slate-400">
+                  （目標 {String(checkInTime.hour).padStart(2, '0')}:{String(checkInTime.minute).padStart(2, '0')} 前）
+                </span>
+              </p>
             </div>
             {guidanceRemainingToday > 0 && !guidanceDrawsToday.length && !guidanceDrawing && (
               <span className="shrink-0 text-[10px] font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-100">
-                可抽
+                可打卡
               </span>
             )}
           </div>
@@ -1818,12 +1928,12 @@ function AppInner() {
           ) : (
             <button
               type="button"
-              onClick={handleDrawTodayGuidance}
+              onClick={handleStartYourDay}
               className="group relative z-10 w-full overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50 py-3.5 text-center font-black text-indigo-700 shadow-sm transition-all active:scale-[0.99] md:hover:bg-indigo-100/70"
             >
               <span className="relative flex items-center justify-center gap-2">
                 <Sparkles size={18} className="text-amber-500" />
-                抽取今日指引
+                開始您的一天
               </span>
             </button>
           )}
@@ -2414,6 +2524,9 @@ function AppInner() {
       if (section === 'settlement') {
         setDraftSettlementTime({ ...settlementTime });
       }
+      if (section === 'checkin') {
+        setDraftCheckInTime({ ...checkInTime });
+      }
       if (section === 'habits') {
         setTempHabits([...habits]);
       }
@@ -2472,6 +2585,11 @@ function AppInner() {
     cancelSettingsEdit();
   };
 
+  const saveCheckInSection = () => {
+    setCheckInTime(normalizeCheckInTime(draftCheckInTime));
+    cancelSettingsEdit();
+  };
+
   const saveHabitsSection = () => {
     const next = tempHabits.map((h) => String(h ?? '').trim()).slice(0, 9);
     const filled = [...next];
@@ -2497,6 +2615,7 @@ function AppInner() {
   const renderSettings = () => {
     const settlementDisplay = `${String(settlementTime.hour).padStart(2, '0')}:${String(settlementTime.minute).padStart(2, '0')}`;
     const draftTimeInputValue = `${String(draftSettlementTime.hour).padStart(2, '0')}:${String(draftSettlementTime.minute).padStart(2, '0')}`;
+    const draftCheckInInputValue = `${String(draftCheckInTime.hour).padStart(2, '0')}:${String(draftCheckInTime.minute).padStart(2, '0')}`;
 
     const editActions = (onSave) => (
       <div className="mt-4 flex gap-2 justify-end border-t border-slate-100 pt-3">
@@ -2801,6 +2920,35 @@ function AppInner() {
                 />
               </div>
               {editActions(saveSettlementSection)}
+            </>
+          ) : (
+            <div />
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          {sectionHeader('打卡時間', 'checkin')}
+          <p className="text-xs text-slate-500 mb-2">
+            目前：{String(checkInTime.hour).padStart(2, '0')}:{String(checkInTime.minute).padStart(2, '0')} 前打卡為準時。
+            <br />
+            準時打卡 +{CHECK_IN_BASE_EXP} EXP；連續 3 / 7 / 14 / 21 天額外 +10 / 20 / 30 / 50 EXP。
+          </p>
+          {settingsEditingSection === 'checkin' ? (
+            <>
+              <div className="max-h-[52vh] overflow-y-auto pr-1">
+                <input
+                  type="time"
+                  value={draftCheckInInputValue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const [hh, mm] = v.split(':').map(Number);
+                    setDraftCheckInTime({ hour: hh, minute: Number.isFinite(mm) ? mm : 0 });
+                  }}
+                  className="text-[16px] border border-slate-200 rounded-lg px-3 py-2 text-slate-800"
+                />
+              </div>
+              {editActions(saveCheckInSection)}
             </>
           ) : (
             <div />
